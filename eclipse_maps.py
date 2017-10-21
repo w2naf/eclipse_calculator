@@ -18,7 +18,7 @@ def plot_eclipse(date,output_dir='output'):
     map_prm['urcrnrlat'] =   55.
 
     # Eclipse Magnitude
-    gs_grid     = eclispe_calc.locator.gridsquare_grid(precision=4).flatten()
+    gs_grid     = eclipse_calc.locator.gridsquare_grid(precision=4).flatten()
     ll_grid     = eclipse_calc.locator.gridsquare2latlon(gs_grid)
     lats,lons   = ll_grid
     ecl_mags    = np.array([eclipse_calc.eclipse_mag(lat,lon,date) for lat,lon in zip(lats,lons)])
