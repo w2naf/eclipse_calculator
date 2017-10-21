@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import datetime
 import ephem
 import numpy as np
@@ -14,10 +13,12 @@ def area_intersect(r_sun,r_moon,d):
         From MathWorld--A Wolfram Web Resource.
         http://mathworld.wolfram.com/Circle-CircleIntersection.html
     """
+
+    if d >= r_sun+r_moon:
+        return 0.
     
     R = r_sun
     r = r_moon
-    
     A = ( r**2 * np.arccos( (d**2 + r**2 - R**2)/(2*d*r))
         + R**2 * np.arccos( (d**2 + R**2 - r**2)/(2*d*R))
         - 0.5 * np.sqrt((-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R))
@@ -84,12 +85,9 @@ if __name__ == '__main__':
     # Moon/Sun size ratio: 1.02879
     lat =  40.90743
     lon = -74.92505
-    partial_0   = datetime.datetime(2017,8,21,17,21,10)
-    total_0     = None
-    eclipse_max = datetime.datetime(2017,8,21,18,43,13)
-    total_1     = None
-    partial_1   = datetime.datetime(2017,8,21,19,59,29)
+#    eclipse_max = datetime.datetime(2017,8,21,18,43,13)
+#    mag         = eclipse_mag(lat,lon,eclipse_max,debug=True)
 
-    
-    mag         = eclipse_mag(lat,lon,eclipse_max,debug=True)
+    no_eclipse  = datetime.datetime(2017,8,21,14)
+    mag         = eclipse_mag(lat,lon,no_eclipse,debug=True)
     print(mag)
