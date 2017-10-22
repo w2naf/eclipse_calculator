@@ -102,13 +102,13 @@ if __name__ == '__main__':
     output_dir  = 'output'
     eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
-#    sDate   = datetime.datetime(2017,8,21,14)
-#    eDate   = datetime.datetime(2017,8,21,22)
-    sDate   = datetime.datetime(2017,8,21,18)
-    eDate   = datetime.datetime(2017,8,21,19)
+    sdate   = datetime.datetime(2017,8,21,14)
+    edate   = datetime.datetime(2017,8,21,22)
+#    sDate   = datetime.datetime(2017,8,21,18)
+#    eDate   = datetime.datetime(2017,8,21,19)
     dt      = datetime.timedelta(minutes=5)
 
-    precision   = 2
+    precision   = 4
     height      = 300e3
 
     loc_dict    = location_dict(precision=precision,height=height)
