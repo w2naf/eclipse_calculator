@@ -102,8 +102,8 @@ if __name__ == '__main__':
     output_dir  = 'output'
     eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
-    sdate   = datetime.datetime(2017,8,21,14)
-    edate   = datetime.datetime(2017,8,21,22)
+    sDate   = datetime.datetime(2017,8,21,14)
+    eDate   = datetime.datetime(2017,8,21,22)
 #    sDate   = datetime.datetime(2017,8,21,18)
 #    eDate   = datetime.datetime(2017,8,21,19)
     dt      = datetime.timedelta(minutes=5)
