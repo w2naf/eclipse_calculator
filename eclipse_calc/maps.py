@@ -344,6 +344,6 @@ class HamMap(object):
         self.ax.add_collection(pcoll,autolim=False)
 
         if plot_cbar:
-            cbar    = self.fig.colorbar(pcoll,label=label)
+            cbar    = self.fig.colorbar(pcoll,label=label,shrink=0.7)
 
         return pcoll
