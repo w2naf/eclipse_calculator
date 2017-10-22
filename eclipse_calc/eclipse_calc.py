@@ -40,7 +40,7 @@ def area_intersect(r_sun,r_moon,d):
 def apparent_size(R, distance):
         return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
-def calculate_obscuration(date_time,lat,lon,height=0.,debug=False):
+def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,debug=False):
     """
     date_time:  datetime.datetime object
     lat:        degrees +N / -S
@@ -55,7 +55,8 @@ def calculate_obscuration(date_time,lat,lon,height=0.,debug=False):
     R_sun   = constants.R_sun
     R_moon  = 1737.1 * u.km
 
-    loc     = EarthLocation.from_geodetic(lon,lat,height)
+    if loc is not None:
+        loc     = EarthLocation.from_geodetic(lon,lat,height)
     time_aa = Time(date_time)
     aaframe = AltAz(obstime=time_aa, location=loc)
 
