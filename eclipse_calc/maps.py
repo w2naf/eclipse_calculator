@@ -231,9 +231,9 @@ class HamMap(object):
             fontdict = {'size':matplotlib.rcParams['axes.titlesize'],'weight':matplotlib.rcParams['axes.titleweight']}
             ax.text(0.5,1.075,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
 
-        if subtitle is not None:
-            fontdict    = {'weight':'normal'}
-            ax.text(0.5,1.025,subtitle,fontdict=fontdict,transform=ax.transAxes,ha='center')
+            if subtitle is not None:
+                fontdict    = {'weight':'normal'}
+                ax.text(0.5,1.025,subtitle,fontdict=fontdict,transform=ax.transAxes,ha='center')
 
         # draw parallels and meridians.
         # This is now done in the locator. overlay section...
@@ -308,7 +308,7 @@ class HamMap(object):
 
     def overlay_gridsquare_data(self,gridsquares,data,
             cmap=None,vmin=None,vmax=None,zorder=99,
-            label=None,plot_cbar=True):
+            plot_cbar=True,cbar_label=None,cbar_ticks=None,cbar_shrink=0.7):
         """
         Overlay gridsquare data on a map.
         """
@@ -344,6 +344,8 @@ class HamMap(object):
         self.ax.add_collection(pcoll,autolim=False)
 
         if plot_cbar:
-            cbar    = self.fig.colorbar(pcoll,label=label,shrink=0.7)
+            cbar    = self.fig.colorbar(pcoll,label=cbar_label,shrink=cbar_shrink)
+            if cbar_ticks is not None:
+                cbar.set_ticks(cbar_ticks)
 
         return pcoll

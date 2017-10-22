@@ -40,7 +40,7 @@ def area_intersect(r_sun,r_moon,d):
 def apparent_size(R, distance):
         return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
-def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,debug=False):
+def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
     """
     date_time:  datetime.datetime object
     lat:        degrees +N / -S
@@ -55,21 +55,22 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,debug=F
     R_sun   = constants.R_sun
     R_moon  = 1737.1 * u.km
 
-    if loc is not None:
+    if loc is None:
         loc     = EarthLocation.from_geodetic(lon,lat,height)
-    time_aa = Time(date_time)
-    aaframe = AltAz(obstime=time_aa, location=loc)
 
-    sun_aa  = get_sun(time_aa).transform_to(aaframe)
-    moon_aa = get_moon(time_aa).transform_to(aaframe)
-    sep     = sun_aa.separation(moon_aa)
+    time_aa     = Time(date_time)
+    aaframe     = AltAz(obstime=time_aa, location=loc)
 
-    sunsize  = apparent_size(R_sun, sun_aa.distance)
-    moonsize = apparent_size(R_moon, moon_aa.distance)
+    sun_aa      = get_sun(time_aa).transform_to(aaframe)
+    moon_aa     = get_moon(time_aa).transform_to(aaframe)
+    sep         = sun_aa.separation(moon_aa)
 
-    r_sun_deg  = sunsize.to(u.degree).value
-    r_moon_deg = moonsize.to(u.degree).value
-    sep_deg    = sep.degree
+    sunsize     = apparent_size(R_sun, sun_aa.distance)
+    moonsize    = apparent_size(R_moon, moon_aa.distance)
+
+    r_sun_deg   = sunsize.to(u.degree).value
+    r_moon_deg  = moonsize.to(u.degree).value
+    sep_deg     = sep.degree
 
     A   = area_intersect(r_sun_deg,r_moon_deg,sep_deg)
     obs = A/(np.pi*r_sun_deg**2)
