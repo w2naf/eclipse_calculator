@@ -1,81 +1,101 @@
 #!/usr/bin/env python3
 import datetime
-import ephem
 import numpy as np
+
+#import astropy
+from astropy import units as u
+from astropy.time import Time
+from astropy.coordinates import EarthLocation, AltAz, get_sun, get_moon
+from astropy import constants
 
 def area_intersect(r_sun,r_moon,d):
     """
     Calculate the area of intersecting circles with radii R
     and r and separation d.
-    
+
     Reference:
     Weisstein, Eric W. "Circle-Circle Intersection."
         From MathWorld--A Wolfram Web Resource.
         http://mathworld.wolfram.com/Circle-CircleIntersection.html
     """
-
-    if d >= r_sun+r_moon:
-        return 0.
     
-    R = r_sun
-    r = r_moon
-    A = ( r**2 * np.arccos( (d**2 + r**2 - R**2)/(2*d*r))
-        + R**2 * np.arccos( (d**2 + R**2 - r**2)/(2*d*R))
-        - 0.5 * np.sqrt((-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R))
-        )
-    
-    if np.isnan(A):
-        if r_sun > r_moon:
-            A = np.pi * r_moon**2
-        elif r_sun <= r_moon:
-            A = np.pi * r_sun**2
+    intersect = d <= r_sun + r_moon
+    inset     = d <= np.abs(r_sun-r_moon)
 
+    if not intersect:
+        A = 0
+    elif inset and (r_sun > r_moon):
+        A = np.pi*r_sun**2 - np.pi*r_moon**2
+    elif inset and (r_sun <= r_moon):
+        A = np.pi*r_moon**2
+    else:
+        R = r_sun
+        r = r_moon
+        A = ( r**2 * np.arccos( (d**2 + r**2 - R**2)/(2*d*r))
+            + R**2 * np.arccos( (d**2 + R**2 - r**2)/(2*d*R))
+            - 0.5 * np.sqrt((-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R))
+            )
     return A
 
-def eclipse_mag(lat,lon,date_time,debug=False):
-    obs         = ephem.Observer()
-    obs.lat     = '{!s}'.format(lat)
-    obs.lon     = '{!s}'.format(lon)
-    obs.date    = date_time.strftime('%Y/%m/%d %H:%M:%S')
-    sun         = ephem.Sun()
-    moon        = ephem.Moon()
+def apparent_size(R, distance):
+        return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
-    sun.compute(obs)
-    moon.compute(obs)
+def calculate_obscuration(date_time,lat,lon,height=0.,debug=False):
+    """
+    date_time:  datetime.datetime object
+    lat:        degrees +N / -S
+    lon:        degrees +E / -W
+    height:     meters
 
-    sep = ephem.separation((sun.az, sun.alt), (moon.az, moon.alt))
+    returns:    Eclipse obscuration (solar disk area obscured / solar disk area).
+                Obscuration will be 0 if astronomical night.
+                (Sun is > 18 deg below horizon.)
+    """
 
-    sun_size_deg  = sun.size/3600.
-    moon_size_deg = moon.size/3600.
+    R_sun   = constants.R_sun
+    R_moon  = 1737.1 * u.km
 
-    sun_size_rad  = sun_size_deg  * np.pi/180.
-    moon_size_rad = moon_size_deg * np.pi/180.
+    loc     = EarthLocation.from_geodetic(lon,lat,height)
+    time_aa = Time(date_time)
+    aaframe = AltAz(obstime=time_aa, location=loc)
 
-    A            = area_intersect(sun_size_rad,moon_size_rad,sep)
-    sun_area_rad = np.pi*sun_size_rad**2
-    mag          = A/sun_area_rad
+    sun_aa  = get_sun(time_aa).transform_to(aaframe)
+    moon_aa = get_moon(time_aa).transform_to(aaframe)
+    sep     = sun_aa.separation(moon_aa)
 
-    if debug:
-        print('Sun:  {:f} arcsec'.format(sun.size))
-        print('Moon: {:f} arcsec'.format(moon.size))
-        print('Sep:  {!s}'.format(sep))
-        print('')
+    sunsize  = apparent_size(R_sun, sun_aa.distance)
+    moonsize = apparent_size(R_moon, moon_aa.distance)
 
-        print('Sun:  {:f} deg'.format(sun_size_deg))
-        print('Moon: {:f} deg'.format(moon_size_deg))
-        print('Sep:  {:f} deg'.format(np.degrees(sep)))
-        print('')
+    r_sun_deg  = sunsize.to(u.degree).value
+    r_moon_deg = moonsize.to(u.degree).value
+    sep_deg    = sep.degree
 
-        print('Sun:  {:f} radians'.format(sun_size_rad))
-        print('Moon: {:f} radians'.format(moon_size_rad))
-        print('Sep:  {:f} radians'.format(sep))
-        print('')
+    A   = area_intersect(r_sun_deg,r_moon_deg,sep_deg)
+    obs = A/(np.pi*r_sun_deg**2)
 
-        print('Intersection Area: {:f}'.format(A))
-        print('Sun Area: {:f}'.format(sun_area_rad))
-        print('Eclipse Magnitude: {:f}'.format(mag))
-    
-    return mag
+    if sun_aa.alt.value < 18:
+            obs = 0
+
+#    # Code to plot the obscuration.
+#    # From https://gist.github.com/eteq/f879c2fe69d75d1c5a9e007b0adce30d
+#    sun_circle  = plt.Circle((sun_aa.az.deg, sun_aa.alt.deg), 
+#			    sunsize.to(u.deg).value,
+#			    fc='yellow')
+#    moon_circle = plt.Circle((moon_aa.az.deg, moon_aa.alt.deg), 
+#			     moonsize.to(u.deg).value,
+#			     fc='black', alpha=.5)
+#
+#    ax = plt.subplot(aspect=1)
+#    ax.add_patch(sun_circle)
+#    ax.add_patch(moon_circle)
+#    biggest = max(sep.deg, sunsize.to(u.deg).value, moonsize.to(u.deg).value)
+#    plt.xlim(sun_aa.az.deg-biggest*1.2, sun_aa.az.deg+biggest*1.2)
+#    plt.ylim(sun_aa.alt.deg-biggest*1.2, sun_aa.alt.deg+biggest*1.2)
+#
+#    plt.xlabel('Azimuth')
+#    plt.ylabel('Altitude');
+
+    return obs
 
 if __name__ == '__main__':
     # UACNJ Jenny Jump - Hope, NJ
@@ -85,9 +105,16 @@ if __name__ == '__main__':
     # Moon/Sun size ratio: 1.02879
     lat =  40.90743
     lon = -74.92505
-#    eclipse_max = datetime.datetime(2017,8,21,18,43,13)
-#    mag         = eclipse_mag(lat,lon,eclipse_max,debug=True)
+    date_time   = datetime.datetime(2017,8,21,18,43,13)
+    obs         = calculate_obscuration(date_time,lat,lon)
+    print('UACNJ at Jenny Jump ({!s}, {!s})'.format(lat,lon))
+    print('   Eclipse Max: {!s}'.format(date_time))
+    print('   Expected Obscuration from X. Jubier\'s Web Site: 0.72284')
+    print('   Astropy Calculated Obscuration: {!s}'.format(obs))
+    print('')
 
-    no_eclipse  = datetime.datetime(2017,8,21,14)
-    mag         = eclipse_mag(lat,lon,no_eclipse,debug=True)
-    print(mag)
+    date_time   = datetime.datetime(2017,8,21,14)
+    obs         = calculate_obscuration(date_time,lat,lon)
+    print('   No Eclipse: {!s}'.format(date_time))
+    print('   Astropy Calculated Obscuration: {!s}'.format(obs))
+    print('')
