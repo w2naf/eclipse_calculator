@@ -13,3 +13,5 @@ has already been completed in the output/ directory.
   (astronomical night). This accounts for the sharp edges seen in the figures.
 * Obscuration was calculated at 300 km altitude for purposes of studying
   the ionosphere and HF radio propagation effects.
+
+![](eclipse.gif)
