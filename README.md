@@ -6,5 +6,10 @@ Results from this have been spot-checked against http://xjubier.free.fr/en/site_
 
 This repository includes eclipse_maps.py, which will generate world maps and CSV files
 of eclipse obscuration. Note that this is *VERY* slow. One run (along with a movie)
-has already been completed in the output/ directory. This run was completed using 
-4-character Maidenhead Gridsquare resolution (https://en.wikipedia.org/wiki/Maidenhead_Locator_System).
+has already been completed in the output/ directory.
+* This run was completed using 4-character Maidenhead Gridsquare resolution
+  (https://en.wikipedia.org/wiki/Maidenhead_Locator_System).
+* Obscuration is set to 0 when the sun is more than 18 degrees below the horizon
+  (astronomical night). This accounts for the sharp edges seen in the figures.
+* Obscuration was calculated at 300 km altitude for purposes of studying
+  the ionosphere and HF radio propagation effects.
