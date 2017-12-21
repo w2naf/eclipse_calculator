@@ -15,3 +15,5 @@ has already been completed in the output/ directory.
   the ionosphere and HF radio propagation effects.
 
 ![](eclipse.gif)
+
+[![DOI](https://zenodo.org/badge/106658040.svg)](https://zenodo.org/badge/latestdoi/106658040)
