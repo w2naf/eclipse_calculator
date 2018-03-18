@@ -8,6 +8,37 @@ from astropy.time import Time
 from astropy.coordinates import EarthLocation, AltAz, get_sun, get_moon
 from astropy import constants
 
+def array(val):
+    val = np.array(val)
+    if val.shape == ():
+        val.shape = (1,)
+    return val
+
+def conform(arr_0,arr_1):
+    """
+    Conform arr_0 to arr_1.
+    """
+    if arr_0.shape != arr_1.shape:
+        arr_0 = np.ones(arr_1.shape)*arr_0[0]
+    return arr_0
+
+def raw_area(R,r,d):
+    """
+    Calculate the area of intersecting circles with radii R
+    and r and separation d, but do not account for zero intersection,
+    annular eclipse, moon is larger than the sun.
+
+    R = r_sun
+    r = r_moon
+    """
+
+    A = ( r**2 * np.arccos( (d**2 + r**2 - R**2)/(2*d*r))
+        + R**2 * np.arccos( (d**2 + R**2 - r**2)/(2*d*R))
+        - 0.5 * np.sqrt((-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R))
+        )
+
+    return A
+
 def area_intersect(r_sun,r_moon,d):
     """
     Calculate the area of intersecting circles with radii R
@@ -18,23 +49,32 @@ def area_intersect(r_sun,r_moon,d):
         From MathWorld--A Wolfram Web Resource.
         http://mathworld.wolfram.com/Circle-CircleIntersection.html
     """
-    
+
+    r_sun   = array(r_sun)
+    r_moon  = array(r_moon)
+    d       = array(d)
+
     intersect = d <= r_sun + r_moon
     inset     = d <= np.abs(r_sun-r_moon)
 
-    if not intersect:
-        A = 0
-    elif inset and (r_sun > r_moon):
-        A = np.pi*r_sun**2 - np.pi*r_moon**2
-    elif inset and (r_sun <= r_moon):
-        A = np.pi*r_moon**2
-    else:
-        R = r_sun
-        r = r_moon
-        A = ( r**2 * np.arccos( (d**2 + r**2 - R**2)/(2*d*r))
-            + R**2 * np.arccos( (d**2 + R**2 - r**2)/(2*d*R))
-            - 0.5 * np.sqrt((-d+r+R)*(d+r-R)*(d-r+R)*(d+r+R))
-            )
+    A       = np.empty(r_sun.shape)
+    A[:]    = np.nan
+    
+    tf_none         = np.logical_not(intersect)
+    A[tf_none]      = 0.
+
+    # Compute area when the sun is bigger than the moon.
+    tf_annular      = np.logical_and(inset,r_sun > r_moon)
+    A[tf_annular]   = np.pi*r_sun[tf_annular]**2 - np.pi*r_moon[tf_annular]**2
+
+    # Compute area when the moon is bigger than the sun.
+    tf_total        = np.logical_and(inset,r_sun <= r_moon)
+    A[tf_total]     = np.pi*r_moon[tf_total]**2
+
+    # Compute area for the partial eclipses.
+    tf              = np.logical_not(np.logical_or.reduce((tf_none,tf_annular,tf_total)))
+    A[tf]           = raw_area(r_sun[tf],r_moon[tf],d[tf])
+
     return A
 
 def apparent_size(R, distance):
@@ -51,6 +91,14 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
                 Obscuration will be 0 if astronomical night.
                 (Sun is > 18 deg below horizon.)
     """
+    date_time   = array(date_time)
+    lat         = array(lat)
+    lon         = array(lon)
+    height      = array(height)
+
+    lat         = conform(lat,date_time)
+    lon         = conform(lon,date_time)
+    height      = conform(height,date_time)
 
     R_sun   = constants.R_sun
     R_moon  = 1737.1 * u.km
@@ -75,8 +123,8 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
     A   = area_intersect(r_sun_deg,r_moon_deg,sep_deg)
     obs = A/(np.pi*r_sun_deg**2)
 
-    if sun_aa.alt.value < 18:
-            obs = 0
+    tf      = sun_aa.alt.value < 18
+    obs[tf] = 0
 
 #    # Code to plot the obscuration.
 #    # From https://gist.github.com/eteq/f879c2fe69d75d1c5a9e007b0adce30d
@@ -97,6 +145,8 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
 #    plt.xlabel('Azimuth')
 #    plt.ylabel('Altitude');
 
+    if len(obs) == 1:
+        obs = float(obs)
     return obs
 
 if __name__ == '__main__':
@@ -120,3 +170,19 @@ if __name__ == '__main__':
     print('   No Eclipse: {!s}'.format(date_time))
     print('   Astropy Calculated Obscuration: {!s}'.format(obs))
     print('')
+
+
+    # Test vectorized version of code.
+    sDate   = datetime.datetime(2017,8,21,14)
+    eDate   = datetime.datetime(2017,8,21,22)
+    dates   = [sDate]
+    while dates[-1] < eDate:
+        new_date    = dates[-1] + datetime.timedelta(minutes=2)
+        dates.append(new_date)
+
+    lat     =  40.90743
+    lon     = -74.92505
+    dates   = np.array(dates)
+
+    obs     = calculate_obscuration(dates,lat,lon,height=3e5)
+    print(obs)
