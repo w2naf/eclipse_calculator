@@ -20,11 +20,12 @@ def location_dict(precision=2,height=0.):
     ll_grid     = eclipse_calc.locator.gridsquare2latlon(gs_grid)
     lats,lons   = ll_grid
 
-    dd          = OrderedDict()
-    dd['grid']  = gs_grid
-    dd['lat']   = lats
-    dd['lon']   = lons
-    dd['loc']   = [EarthLocation.from_geodetic(lon,lat,height) for lat,lon in zip(lats,lons)]
+    dd              = OrderedDict()
+    dd['grid']      = gs_grid
+    dd['lat']       = lats
+    dd['lon']       = lons
+    dd['height']    = np.ones(lats.shape)*height
+#    dd['loc']   = [EarthLocation.from_geodetic(lon,lat,height) for lat,lon in zip(lats,lons)]
     return dd
 
 def plot_eclipse_dict(run_dict):
@@ -46,10 +47,13 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     dd['grid']  = loc_dict['grid']
     dd['lat']   = loc_dict['lat']
     dd['lon']   = loc_dict['lon']
-    locs        = loc_dict['loc']
+    dd['height']= loc_dict['height']
+#    locs        = loc_dict['loc']
 
     # Eclipse Magnitude
-    dd['obsc']  = np.array([eclipse_calc.calculate_obscuration(date,loc=loc) for loc in locs])
+#    dd['obsc']  = np.array([eclipse_calc.calculate_obscuration(date,loc=loc) for loc in locs])
+    dates       = np.array(len(dd['lat'])*[date])
+    dd['obsc']  = eclipse_calc.calculate_obscuration(dates,dd['lat'],dd['lon'],height=dd['height'])
 #    dd['obsc']  = dd['lat'] # Useful for debugging plotting.
 
     # Store into dataframe.
