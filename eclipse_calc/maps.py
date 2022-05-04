@@ -23,7 +23,11 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.markers as mmarkers
 from matplotlib.collections import PolyCollection
-from mpl_toolkits.basemap import Basemap
+import matplotlib.ticker as mticker
+
+import cartopy.crs as ccrs
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from cartopy.feature.nightshade import Nightshade
 
 from . import locator
 
@@ -185,10 +189,9 @@ class HamMap(object):
 
     Written by Nathaniel Frissell 2014 Sept 06
     """
-    def __init__(self,sTime,eTime,ax=None,
+    def __init__(self,sTime,eTime=None,ax=None,crs=ccrs.PlateCarree(),
             llcrnrlon=-180.,llcrnrlat=-90.,urcrnrlon=180.,urcrnrlat=90.,
-            coastline_color='0.65',coastline_zorder=10,band_data=None,show_title=True,
-            subtitle=None):
+            band_data=None,show_title=True,subtitle=None,nightshade=True):
 
         llb = {}
         llb['llcrnrlon'] = llcrnrlon
@@ -196,6 +199,9 @@ class HamMap(object):
         llb['urcrnrlon'] = urcrnrlon
         llb['urcrnrlat'] = urcrnrlat
         self.latlon_bnds    = llb
+
+        if eTime is None:
+            eTime = sTime
 
         self.metadata       = {}
         self.metadata['sTime'] = sTime
@@ -205,26 +211,29 @@ class HamMap(object):
             band_data = BandData()
         self.band_data = band_data
 
-        self.__setup_map__(ax=ax,
-                coastline_color=coastline_color,coastline_zorder=coastline_zorder,
+        self.__setup_map__(ax=ax,crs=crs,
                 subtitle=subtitle,show_title=show_title,**self.latlon_bnds)
 
-#        self.plot_nightshade()
+        if nightshade:
+            self.plot_nightshade()
 #        self.plot_band_legend(band_data=self.band_data)
 #        self.overlay_gridsquares()
 
-    def __setup_map__(self,ax=None,llcrnrlon=-180.,llcrnrlat=-90,urcrnrlon=180.,urcrnrlat=90.,
-            coastline_color='0.65',coastline_zorder=10,show_title=True,subtitle=None):
+    def __setup_map__(self,ax=None,crs=ccrs.PlateCarree(),
+            coastline_color='0.65',coastline_zorder=10,
+            llcrnrlon=-180.,llcrnrlat=-90,urcrnrlon=180.,urcrnrlat=90.,
+            show_title=True,subtitle=None):
         sTime       = self.metadata['sTime']
         eTime       = self.metadata['eTime']
 
         if ax is None:
             fig     = plt.figure(figsize=(10,6))
-            ax      = fig.add_subplot(111)
+            ax      = fig.add_subplot(111,projection=crs)
         else:
             fig     = ax.get_figure()
 
-        m = Basemap(llcrnrlon=llcrnrlon,llcrnrlat=llcrnrlat,urcrnrlon=urcrnrlon,urcrnrlat=urcrnrlat,resolution='l',area_thresh=1000.,projection='cyl',ax=ax)
+        ax.set_xlim(llcrnrlon,urcrnrlon)
+        ax.set_ylim(llcrnrlat,urcrnrlat)
 
         if show_title:
             title = sTime.strftime('%d %b %Y %H%M UT - ')+eTime.strftime('%d %b %Y %H%M UT')
@@ -236,31 +245,28 @@ class HamMap(object):
                 ax.text(0.5,1.025,subtitle,fontdict=fontdict,transform=ax.transAxes,ha='center')
 
         # draw parallels and meridians.
-        # This is now done in the locator. overlay section...
-#        m.drawparallels(np.arange( -90., 91.,45.),color='k',labels=[False,True,True,False])
-#        m.drawmeridians(np.arange(-180.,181.,45.),color='k',labels=[True,False,False,True])
-        m.drawcoastlines(color=coastline_color,zorder=coastline_zorder)
-        m.drawmapboundary(fill_color='w')
+        ax.coastlines(color=coastline_color,zorder=coastline_zorder)
+        ax.gridlines(draw_labels=True)
 
         # Expose select object
         self.fig        = fig
         self.ax         = ax
-        self.m          = m
+        self.crs        = crs
 
-    def plot_nightshade(self,color='0.60'):
+    def plot_nightshade(self,alpha=0.10,zorder=5):
         # Overlay nighttime terminator.
         sTime       = self.metadata['sTime']
         eTime       = self.metadata['eTime']
         half_time   = datetime.timedelta(seconds= ((eTime - sTime).total_seconds()/2.) )
         center_time = sTime + half_time
-        self.m.nightshade(center_time,color=color)
+        self.ax.add_feature(Nightshade(center_time,alpha=alpha),zorder=zorder)
         
     def plot_band_legend(self,*args,**kw_args):
         band_legend(*args,**kw_args)
 
     def overlay_gridsquares(self,
-            major_precision = 2,    major_style = {'color':'k',   'dashes':[1,1]}, 
-            minor_precision = 0,    minor_style = {'color':'0.8', 'dashes':[1,1]},
+            major_precision = 2,    major_style = {'color':'k',    'alpha':1,   'linestyle':'--'}, 
+            minor_precision = 0,    minor_style = {'color':'gray', 'alpha':0.8, 'linestyle':'--'}, 
             label_precision = 2,    label_fontdict=None, label_zorder = 100):
         """
         Overlays a grid square grid.
@@ -272,8 +278,8 @@ class HamMap(object):
         """
     
         # Get the dataset and map object.
-        m           = self.m
         ax          = self.ax
+        crs         = self.crs
 
         major_style['zorder'] = 200
         minor_style['zorder'] = 200
@@ -286,22 +292,22 @@ class HamMap(object):
 	# Draw Major Grid Squares
         if maj_prec > 0:
             lats,lons   = locator.grid_latlons(maj_prec,position='lower left')
-
-            m.drawparallels(lats[0,:],labels=[False,True,True,False],**major_style)
-            m.drawmeridians(lons[:,0],labels=[True,False,False,True],**major_style)
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=False,**major_style)
+            gl.xlocator = mticker.FixedLocator(lons[:,0])
+            gl.ylocator = mticker.FixedLocator(lats[0,:])
 
 	# Draw minor Grid Squares
         if min_prec > 0:
             lats,lons   = locator.grid_latlons(min_prec,position='lower left')
-
-            m.drawparallels(lats[0,:],labels=[False,False,False,False],**minor_style)
-            m.drawmeridians(lons[:,0],labels=[False,False,False,False],**minor_style)
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=False,**minor_style)
+            gl.xlocator = mticker.FixedLocator(lons[:,0])
+            gl.ylocator = mticker.FixedLocator(lats[0,:])
 
 	# Label Grid Squares
         if label_prec > 0:
             lats,lons   = locator.grid_latlons(label_prec,position='center')
             grid_grid   = locator.gridsquare_grid(label_prec)
-            xx,yy = m(lons,lats)
+            xx,yy = lons,lats
             for xxx,yyy,grd in zip(xx.ravel(),yy.ravel(),grid_grid.ravel()):
                 ax.text(xxx,yyy,grd,ha='center',va='center',clip_on=True,
                         fontdict=label_fontdict, zorder=label_zorder)
@@ -328,10 +334,10 @@ class HamMap(object):
 
         verts   = []
         for lat_ll,lon_ll,lat_lr,lon_lr,lat_ur,lon_ur,lat_ul,lon_ul in coords:
-            x1,y1 = self.m(lon_ll,lat_ll)
-            x2,y2 = self.m(lon_lr,lat_lr)
-            x3,y3 = self.m(lon_ur,lat_ur)
-            x4,y4 = self.m(lon_ul,lat_ul)
+            x1,y1 = (lon_ll,lat_ll)
+            x2,y2 = (lon_lr,lat_lr)
+            x3,y3 = (lon_ur,lat_ur)
+            x4,y4 = (lon_ul,lat_ul)
             verts.append(((x1,y1),(x2,y2),(x3,y3),(x4,y4),(x1,y1)))
 
         vals    = data

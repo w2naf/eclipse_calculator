@@ -11,7 +11,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 from matplotlib import pyplot as plt
 
-from astropy.coordinates import EarthLocation
+import cartopy.crs as ccrs
 
 import eclipse_calc
 
@@ -25,7 +25,6 @@ def location_dict(precision=2,height=0.):
     dd['lat']       = lats
     dd['lon']       = lons
     dd['height']    = np.ones(lats.shape)*height
-#    dd['loc']   = [EarthLocation.from_geodetic(lon,lat,height) for lat,lon in zip(lats,lons)]
     return dd
 
 def plot_eclipse_dict(run_dict):
@@ -86,15 +85,16 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     cbar_ticks  = np.arange(0,1.1,0.1)
 
     fig         = plt.figure(figsize=(12,10))
-    ax          = fig.add_subplot(111)
+    crs         = ccrs.PlateCarree()
+    ax          = fig.add_subplot(111,projection=ccrs.PlateCarree())
     hmap        = eclipse_calc.maps.HamMap(date,date,ax,show_title=False,**map_prm)
-    hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','dashes':[1,1]})
+    hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','linestyle':'--'})
     hmap.overlay_gridsquare_data(dd['grid'],dd['obsc'],vmin=vmin,vmax=vmax,cbar_ticks=cbar_ticks,
                 zorder=5,cmap=cmap,cbar_shrink=0.5,cbar_label='Obscuration')
 
     title       = '{!s} Height: {!s} km'.format(date.strftime('%d %b %Y %H%M UT'),height/1000.)
     fontdict    = {'size':'x-large','weight':'bold'}
-    hmap.ax.text(0.5,1.025,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
+    hmap.ax.text(0.5,1.075,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
     fig.tight_layout()
     fig.savefig(fpath+'.png',bbox_inches='tight')
 
@@ -106,10 +106,12 @@ if __name__ == '__main__':
     output_dir  = 'output'
     eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
-    sDate   = datetime.datetime(2017,8,21,14)
-    eDate   = datetime.datetime(2017,8,21,22)
-#    sDate   = datetime.datetime(2017,8,21,18)
-#    eDate   = datetime.datetime(2017,8,21,19)
+#    sDate   = datetime.datetime(2017,8,21,14)
+#    eDate   = datetime.datetime(2017,8,21,22)
+
+    sDate   = datetime.datetime(2024,4,8,15)
+    eDate   = datetime.datetime(2024,4,8,21)
+
     dt      = datetime.timedelta(minutes=5)
 
     precision   = 4
@@ -127,7 +129,7 @@ if __name__ == '__main__':
         run_list.append(tmp)
         cDate   += dt
 
-#    # Single Processor
+    # Single Processor
 #    for run_dict in run_list:
 #        fpath = plot_eclipse_dict(run_dict)
 
