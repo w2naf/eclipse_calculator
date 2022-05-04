@@ -106,11 +106,17 @@ if __name__ == '__main__':
     output_dir  = 'output'
     eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
-#    sDate   = datetime.datetime(2017,8,21,14)
-#    eDate   = datetime.datetime(2017,8,21,22)
+    # 21 August 2017 Total Solar Eclipse
+    sDate   = datetime.datetime(2017,8,21,14)
+    eDate   = datetime.datetime(2017,8,21,22)
 
-    sDate   = datetime.datetime(2024,4,8,15)
-    eDate   = datetime.datetime(2024,4,8,21)
+#    # 14 October 2023 Total Solar Eclipse
+#    sDate   = datetime.datetime(2023,8,14,15)
+#    eDate   = datetime.datetime(2023,8,14,20)
+
+#    # 8 April 2024 Total Solar Eclipse
+#    sDate   = datetime.datetime(2024,4,8,15)
+#    eDate   = datetime.datetime(2024,4,8,21)
 
     dt      = datetime.timedelta(minutes=5)
 
