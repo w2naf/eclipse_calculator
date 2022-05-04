@@ -1,4 +1,3 @@
-basemap
 pandas
 astropy
 matplotlib
