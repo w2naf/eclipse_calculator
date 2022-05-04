@@ -111,8 +111,8 @@ if __name__ == '__main__':
     eDate   = datetime.datetime(2017,8,21,22)
 
 #    # 14 October 2023 Total Solar Eclipse
-#    sDate   = datetime.datetime(2023,10,14,15)
-#    eDate   = datetime.datetime(2023,10,14,20)
+#    sDate   = datetime.datetime(2023,10,14,14)
+#    eDate   = datetime.datetime(2023,10,14,21)
 
 #    # 8 April 2024 Total Solar Eclipse
 #    sDate   = datetime.datetime(2024,4,8,15)
