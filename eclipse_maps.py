@@ -129,12 +129,20 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
     return df
 
 def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
-        nightshade=True,gridsquares=True):
+        min_obsc=0,max_obsc=1,nightshade=True,gridsquares=True):
     """
     df: Pandas DataFrame with Obscuration Data
     region: 'us' or 'world"
     height: [km]
     """
+
+    if min_obsc > 0:
+        tf = df['obsc'] < min_obsc
+        df.loc[tf,'obsc'] = 0
+
+    if max_obsc < 1:
+        tf = df['obsc'] > max_obsc
+        df.loc[tf,'obsc'] = 0
 
     if eDate is None:
         eDate = sDate
@@ -207,6 +215,9 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     else:
         date_str    = sDate.strftime('%d %b %Y %H%M UT') + eDate.strftime(' - %d %b %Y %H%M UT')
         title       = '{!s}\nHeight: {!s} km'.format(date_str,height/1000.)
+
+    if min_obsc > 0 or max_obsc < 1:
+        title += '\n Obscuration Range Plotted: ({!s}, {!s})'.format(min_obsc,max_obsc)
 
     fontdict    = {'size':'x-large','weight':'bold'}
     hmap.ax.text(0.5,1.075,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
@@ -330,7 +341,14 @@ if __name__ == '__main__':
     out_csv_fname   = max_obsc_bname+'.csv.bz2'
     max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
 
+    ## Plot full maximum obscuration map.
     out_png_fname   = max_obsc_bname+'.png'
     png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname)
+
+    ## Plot max obscurations greater than 90%.
+    min_obsc        = 0.9
+    out_png_fname   = max_obsc_bname+'_{!s}minObsc.png'.format(min_obsc)
+    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                            min_obsc=min_obsc)
 
     timer.stop()
