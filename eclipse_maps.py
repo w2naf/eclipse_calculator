@@ -41,6 +41,26 @@ class ScriptTimer(object):
         print('#--------------------------------------#')
         print()
 
+
+def get_event_name(sDate,eDate,height,dlat,dlon):
+    """
+    Generate an event name that can be used to contain all data files.
+    """
+
+    sDate_str       = sDate.strftime('%Y%m%d.%H%M')
+    eDate_str       = eDate.strftime('%Y%m%d.%H%M')
+
+    nm = []
+    nm.append(sDate_str)
+    nm.append(eDate_str)
+    nm.append('{!s}kmAlt'.format(int(height/1000.)))
+    nm.append('{!s}dlat'.format(dlat))
+    nm.append('{!s}dlon'.format(dlon))
+
+    nm = '_'.join(nm)
+    return nm
+
+
 def location_dict(dlat,dlon,height,lat_0=-90.,lat_1=90,lon_0=-180.,lon_1=180):
     """
     Calculates a mesh grid of latitudes and longitudes at the center points of the
@@ -187,14 +207,60 @@ def plot_eclipse(df,date,region='world',cmap=mpl.cm.gray_r,fig_path='output.png'
     plt.close(fig)
     return fig_path
 
+def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
+    """
+    Read in a set of obscuration dataframe csv.bz2 files and create one file and
+    dataframe that reports the maxium obscuration in each latitude-longitude cell.
+    """
+    fpaths = glob.glob(os.path.join(in_csv_path,pattern))
+    fpaths.sort()
+
+    # Load Eclipses
+    df    = None
+    dates = []
+    files = []
+    for fpath in fpaths:
+        bname = os.path.basename(fpath)
+        files.append(bname)
+
+        date  = datetime.datetime.strptime(bname[:13],'%Y%m%d.%H%M')
+        dates.append(date)
+        cname = 'obsc-{!s}'.format(date.strftime('%H%M'))
+        alt   = str(bname[14:17])
+
+        dft   = pd.read_csv(fpath,comment='#')
+        dft.rename(columns={'obsc':cname},inplace=True)
+        if df is None:
+            df = dft.copy()
+        else:
+            df[cname] = dft[cname]
+
+    # Calculate max obscuration in each cell.
+    tf = df.columns.str.contains('obsc-*')
+    obsc_df = df.loc[:,tf]
+
+    # Store max obscuration in new dataframe.
+    max_obsc = df.loc[:,~tf].copy()
+    max_obsc['max_obsc'] = obsc_df.max(1)
+
+    sDate = min(dates)
+    eDate = max(dates)
+
+    # Save CSV Datafile.
+    if out_csv_fname:
+        hdr = []
+        hdr.append('# Solar Eclipse Maximum Obscuration file for {!s} - {!s}\n'.format(sDate,eDate))
+        hdr.append(','.join(df.columns))
+        hdr = '\n'.join(hdr)
+        max_obsc.to_csv(out_csv_fname,index=False,header=hdr)
+
+    return max_obsc
+    
 if __name__ == '__main__':
     timer = ScriptTimer()
 
     multiproc   = True
     ncpus       = multiprocessing.cpu_count()
-
-    output_dir  = 'output'
-    eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
 ##    # 21 August 2017 Total Solar Eclipse
 ##    sDate   = datetime.datetime(2017,8,21,14)
@@ -221,6 +287,14 @@ if __name__ == '__main__':
 
     height      = 300e3
 
+    ################################################################################ 
+    event_name  = get_event_name(sDate,eDate,height,dlat,dlon)
+    output_dir  = os.path.join('output',event_name)
+    frames_dir  = os.path.join(output_dir,'frames')
+
+    eclipse_calc.gen_lib.clear_dir(output_dir)
+    eclipse_calc.gen_lib.make_dir(frames_dir)
+
     loc_dict    = location_dict(dlat,dlon,height)
 
     run_list    = []
@@ -229,7 +303,7 @@ if __name__ == '__main__':
         tmp = {}
         tmp['date']         = cDate
         tmp['loc_dict']     = loc_dict
-        tmp['output_dir']   = output_dir
+        tmp['output_dir']   = frames_dir
         run_list.append(tmp)
         cDate   += dt
 
@@ -241,5 +315,9 @@ if __name__ == '__main__':
         # Single Processor
         for run_dict in run_list:
             fpath = calc_and_plot_eclipse(run_dict)
+
+    max_obsc_bname  = os.path.join(output_dir,event_name+'_MAX_OBSCURATION')
+    out_csv_fname   = max_obsc_bname+'.csv.bz2'
+    max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
 
     timer.stop()
