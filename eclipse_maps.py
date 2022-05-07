@@ -279,7 +279,7 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
 if __name__ == '__main__':
     timer = ScriptTimer()
 
-    multiproc   = False
+    multiproc   = True
     ncpus       = multiprocessing.cpu_count()
 
 ##    # 21 August 2017 Total Solar Eclipse
@@ -290,17 +290,14 @@ if __name__ == '__main__':
 ##    sDate   = datetime.datetime(2023,10,14,14)
 ##    eDate   = datetime.datetime(2023,10,14,21)
 
-#    # 8 April 2024 Total Solar Eclipse
-#    sDate   = datetime.datetime(2024,4,8,15)
-#    eDate   = datetime.datetime(2024,4,8,21)
-
-    sDate   = datetime.datetime(2024,4,8,17)
-    eDate   = datetime.datetime(2024,4,8,18)
+    # 8 April 2024 Total Solar Eclipse
+    sDate   = datetime.datetime(2024,4,8,15)
+    eDate   = datetime.datetime(2024,4,8,21)
 
     dt      = datetime.timedelta(minutes=5)
 
-    dlat        = 10.
-    dlon        = 10.
+    dlat        = 5.
+    dlon        = 5.
 
 #    dlat        = 0.5
 #    dlon        = 0.5
