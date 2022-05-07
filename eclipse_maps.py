@@ -41,22 +41,6 @@ class ScriptTimer(object):
         print('#--------------------------------------#')
         print()
 
-def bzip2(fname,remove_source_file=True):
-    """
-    Compress a file using bzip2.
-    """
-    with open(fname,'rb') as data:
-        bz2_data = bz2.compress(data.read(),9)
-
-    bz2_fpath = fname+'.bz2'
-    with open(bz2_fpath,'wb') as fl:
-        fl.write(bz2_data)
-
-    if remove_source_file:
-        os.remove(fname)
-
-    return bz2_fpath
-
 def location_dict(dlat,dlon,height,lat_0=-90.,lat_1=90,lon_0=-180.,lon_1=180):
     """
     Calculates a mesh grid of latitudes and longitudes at the center points of the
@@ -77,6 +61,31 @@ def location_dict(dlat,dlon,height,lat_0=-90.,lat_1=90,lon_0=-180.,lon_1=180):
 def plot_eclipse_dict(run_dict):
     return plot_eclipse(**run_dict)
 
+def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
+    # Set up data dictionary.
+    dd              = {}
+    dd['lat']       = lat
+    dd['lon']       = lon
+    dd['height']    = height
+
+    # Eclipse Magnitude
+    dates       = np.array(len(dd['lat'])*[date])
+    dd['obsc']  = eclipse_calc.calculate_obscuration(dates,dd['lat'],dd['lon'],height=dd['height'])
+
+    # Store into dataframe.
+    df          = pd.DataFrame(dd)
+
+    # Save CSV Datafile.
+    if csv_path:
+        hdr = []
+        hdr.append('# Solar Eclipse Obscuration file for {!s}\n'.format(date))
+        hdr.append(','.join(df.columns))
+        hdr = '\n'.join(hdr)
+        df.to_csv(csv_path,index=False,header=hdr)
+
+    return df
+
+
 def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='output'):
     """
     region: 'us' or 'world"
@@ -88,24 +97,8 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     fpath       = os.path.join(output_dir,fname)
     print('Processing {!s}...'.format(fpath))
 
-    # Set up data dictionary.
-    dd          = {}
-    dd['lat']   = loc_dict['lat']
-    dd['lon']   = loc_dict['lon']
-    dd['height']= loc_dict['height']
-
-    # Eclipse Magnitude
-    dates       = np.array(len(dd['lat'])*[date])
-    dd['obsc']  = eclipse_calc.calculate_obscuration(dates,dd['lat'],dd['lon'],height=dd['height'])
-
-    # Store into dataframe.
-    df          = pd.DataFrame(dd)
-
-    # Save CSV Datafile.
-    csv_path    = fpath+'.csv'
-    with open(csv_path,'w') as fl:
-        fl.write('# Solar Eclipse Obscuration file for {!s}\n'.format(date))
-    df.to_csv(csv_path,mode='a')
+    csv_path    = fpath+'.csv.bz2'
+    df = calc_obscuration_df(date,csv_path=csv_path,**loc_dict)
 
     # Calculate vectors of center lats and lons.
     center_lats = np.sort(df['lat'].unique())
@@ -123,7 +116,6 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     lon_0 = center_lons.min() - dlon/2.
     lon_1 = center_lons.max() + dlon/2.
     lons    = np.arange(lon_0,lon_1+dlon,dlon)
-
 
     # Plot data.
     map_prm = {}
@@ -152,7 +144,7 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     hmap.plot_nightshade()
 
     cshape      = (len(center_lats),len(center_lons))
-    obsc_arr    = dd['obsc'].reshape(cshape)
+    obsc_arr    = df['obsc'].to_numpy().reshape(cshape)
     pcoll       = ax.pcolormesh(lons,lats,obsc_arr,vmin=vmin,vmax=vmax,cmap=cmap,zorder=5)
 
     cbar_shrink = 0.5
@@ -173,7 +165,7 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
 if __name__ == '__main__':
     timer = ScriptTimer()
 
-    multiproc   = True
+    multiproc   = False
     ncpus       = multiprocessing.cpu_count()
 
     output_dir  = 'output'
@@ -187,14 +179,21 @@ if __name__ == '__main__':
 ##    sDate   = datetime.datetime(2023,10,14,14)
 ##    eDate   = datetime.datetime(2023,10,14,21)
 
-    # 8 April 2024 Total Solar Eclipse
-    sDate   = datetime.datetime(2024,4,8,15)
-    eDate   = datetime.datetime(2024,4,8,21)
+#    # 8 April 2024 Total Solar Eclipse
+#    sDate   = datetime.datetime(2024,4,8,15)
+#    eDate   = datetime.datetime(2024,4,8,21)
+
+    sDate   = datetime.datetime(2024,4,8,17)
+    eDate   = datetime.datetime(2024,4,8,18)
 
     dt      = datetime.timedelta(minutes=5)
 
     dlat        = 10.
     dlon        = 10.
+
+#    dlat        = 0.5
+#    dlon        = 0.5
+
     height      = 300e3
 
     loc_dict    = location_dict(dlat,dlon,height)
@@ -218,17 +217,6 @@ if __name__ == '__main__':
         for run_dict in run_list:
             fpath = plot_eclipse_dict(run_dict)
 
-    # BZip2 the Output CSV Files
-    csvs = glob.glob(os.path.join(output_dir,'*.csv'))
-    csvs.sort()
-    if multiproc:
-        with multiprocessing.Pool(ncpus) as pool:
-            for _ in tqdm.tqdm(pool.map(bzip2,csvs),
-                        total=len(csvs),dynamic_ncols=True,desc='BZip2 Compressing CSV Files'):
-                pass
-    else:
-        for csv in tqdm.tqdm(csvs,dynamic_ncols=True,desc='BZip2 Compressing CSV Files'):
-            bzip2(csv)
 
     timer.stop()
     import ipdb; ipdb.set_trace()
