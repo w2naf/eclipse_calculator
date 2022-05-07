@@ -60,7 +60,7 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     df          = pd.DataFrame(dd)
 
     # Save CSV Datafile.
-    csv_path    = fpath+'.csv.bz2'
+    csv_path    = fpath+'.csv'
     with open(csv_path,'w') as fl:
         fl.write('# Solar Eclipse Obscuration file for {!s}\n'.format(date))
     df.to_csv(csv_path,mode='a')
