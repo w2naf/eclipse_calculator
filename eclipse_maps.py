@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 import os
 import datetime
-from collections import OrderedDict
+import bz2
+import glob
+import tqdm
+
 import multiprocessing
 
 import numpy as np
@@ -12,8 +15,47 @@ mpl.use("Agg")
 from matplotlib import pyplot as plt
 
 import cartopy.crs as ccrs
+from cartopy.feature.nightshade import Nightshade
 
 import eclipse_calc
+
+class ScriptTimer(object):
+    def __init__(self):
+        self.sTime  = datetime.datetime.now()
+        self.script = os.path.basename(__file__)
+
+        print('{!s} Running...'.format(self.script))
+        print('   Started: {!s}'.format(self.sTime))
+        print()
+
+    def stop(self):
+        self.eTime  = datetime.datetime.now()
+        total       = self.eTime - self.sTime
+
+        print()
+        print('#--------------------------------------#')
+        print('{!s} Finished...'.format(self.script))
+        print('   Started:  {!s}'.format(self.sTime))
+        print('   Finished: {!s}'.format(self.eTime))
+        print('   Duration: {!s}'.format(total))
+        print('#--------------------------------------#')
+        print()
+
+def bzip2(fname,remove_source_file=True):
+    """
+    Compress a file using bzip2.
+    """
+    with open(fname,'rb') as data:
+        bz2_data = bz2.compress(data.read(),9)
+
+    bz2_fpath = fname+'.bz2'
+    with open(bz2_fpath,'wb') as fl:
+        fl.write(bz2_data)
+
+    if remove_source_file:
+        os.remove(fname)
+
+    return bz2_fpath
 
 def location_dict(dlat,dlon,height,lat_0=-90.,lat_1=90,lon_0=-180.,lon_1=180):
     """
@@ -47,7 +89,7 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     print('Processing {!s}...'.format(fpath))
 
     # Set up data dictionary.
-    dd          = OrderedDict()
+    dd          = {}
     dd['lat']   = loc_dict['lat']
     dd['lon']   = loc_dict['lon']
     dd['height']= loc_dict['height']
@@ -64,7 +106,6 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     with open(csv_path,'w') as fl:
         fl.write('# Solar Eclipse Obscuration file for {!s}\n'.format(date))
     df.to_csv(csv_path,mode='a')
-
 
     # Calculate vectors of center lats and lons.
     center_lats = np.sort(df['lat'].unique())
@@ -108,6 +149,7 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     ax          = fig.add_subplot(111,projection=ccrs.PlateCarree())
     hmap        = eclipse_calc.maps.HamMap(date,date,ax,show_title=False,**map_prm)
     hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','linestyle':'--'})
+    hmap.plot_nightshade()
 
     cshape      = (len(center_lats),len(center_lons))
     obsc_arr    = dd['obsc'].reshape(cshape)
@@ -129,16 +171,21 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     return fpath
 
 if __name__ == '__main__':
+    timer = ScriptTimer()
+
+    multiproc   = True
+    ncpus       = multiprocessing.cpu_count()
+
     output_dir  = 'output'
     eclipse_calc.gen_lib.clear_dir(output_dir,php=True)
 
-#    # 21 August 2017 Total Solar Eclipse
-#    sDate   = datetime.datetime(2017,8,21,14)
-#    eDate   = datetime.datetime(2017,8,21,22)
-
-#    # 14 October 2023 Total Solar Eclipse
-#    sDate   = datetime.datetime(2023,10,14,14)
-#    eDate   = datetime.datetime(2023,10,14,21)
+##    # 21 August 2017 Total Solar Eclipse
+##    sDate   = datetime.datetime(2017,8,21,14)
+##    eDate   = datetime.datetime(2017,8,21,22)
+#
+##    # 14 October 2023 Total Solar Eclipse
+##    sDate   = datetime.datetime(2023,10,14,14)
+##    eDate   = datetime.datetime(2023,10,14,21)
 
     # 8 April 2024 Total Solar Eclipse
     sDate   = datetime.datetime(2024,4,8,15)
@@ -146,8 +193,8 @@ if __name__ == '__main__':
 
     dt      = datetime.timedelta(minutes=5)
 
-    dlat        = 0.5
-    dlon        = 0.5
+    dlat        = 10.
+    dlon        = 10.
     height      = 300e3
 
     loc_dict    = location_dict(dlat,dlon,height)
@@ -155,16 +202,35 @@ if __name__ == '__main__':
     run_list    = []
     cDate       = sDate
     while cDate < eDate:
-        tmp = OrderedDict()
+        tmp = {}
         tmp['date']         = cDate
         tmp['loc_dict']     = loc_dict
         tmp['output_dir']   = output_dir
         run_list.append(tmp)
         cDate   += dt
 
-#    # Single Processor
-#    for run_dict in run_list:
-#        fpath = plot_eclipse_dict(run_dict)
+    ## Calculate Eclipse Data and Plot
+    if multiproc:
+        with multiprocessing.Pool(ncpus) as pool:
+            pool.map(plot_eclipse_dict,run_list)
+    else:
+        # Single Processor
+        for run_dict in run_list:
+            fpath = plot_eclipse_dict(run_dict)
 
-    with multiprocessing.Pool() as pool:
-        pool.map(plot_eclipse_dict,run_list)
+    # BZip2 the Output CSV Files
+    csvs = glob.glob(os.path.join(output_dir,'*.csv'))
+    csvs.sort()
+    if multiproc:
+        with multiprocessing.Pool(ncpus) as pool:
+            for _ in tqdm.tqdm(pool.map(bzip2,csvs),
+                        total=len(csvs),dynamic_ncols=True,desc='BZip2 Compressing CSV Files'):
+                pass
+    else:
+        for csv in tqdm.tqdm(csvs,dynamic_ncols=True,desc='BZip2 Compressing CSV Files'):
+            bzip2(csv)
+
+    timer.stop()
+    import ipdb; ipdb.set_trace()
+
+
