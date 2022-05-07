@@ -2,4 +2,3 @@ pandas
 astropy
 matplotlib
 numpy
-cartopy
