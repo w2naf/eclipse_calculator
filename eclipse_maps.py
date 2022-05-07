@@ -128,13 +128,16 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
 
     return df
 
-def plot_eclipse(df,date,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
+def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
         nightshade=True,gridsquares=True):
     """
     df: Pandas DataFrame with Obscuration Data
     region: 'us' or 'world"
     height: [km]
     """
+
+    if eDate is None:
+        eDate = sDate
 
     height = df['height'].unique()
     n_heights = len(height)
@@ -180,7 +183,7 @@ def plot_eclipse(df,date,region='world',cmap=mpl.cm.gray_r,fig_path='output.png'
     fig         = plt.figure(figsize=(12,10))
     crs         = ccrs.PlateCarree()
     ax          = fig.add_subplot(111,projection=ccrs.PlateCarree())
-    hmap        = eclipse_calc.maps.HamMap(date,date,ax,show_title=False,**map_prm)
+    hmap        = eclipse_calc.maps.HamMap(sDate,eDate,ax,show_title=False,**map_prm)
 
     if gridsquares:
         hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','linestyle':'--'})
@@ -198,7 +201,13 @@ def plot_eclipse(df,date,region='world',cmap=mpl.cm.gray_r,fig_path='output.png'
     if cbar_ticks is not None:
         cbar.set_ticks(cbar_ticks)
 
-    title       = '{!s} Height: {!s} km'.format(date.strftime('%d %b %Y %H%M UT'),height/1000.)
+    if sDate == eDate:
+        date_str    = sDate.strftime('%d %b %Y %H%M UT')
+        title       = '{!s} Height: {!s} km'.format(date_str,height/1000.)
+    else:
+        date_str    = sDate.strftime('%d %b %Y %H%M UT') + eDate.strftime(' - %d %b %Y %H%M UT')
+        title       = '{!s}\nHeight: {!s} km'.format(date_str,height/1000.)
+
     fontdict    = {'size':'x-large','weight':'bold'}
     hmap.ax.text(0.5,1.075,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
     fig.tight_layout()
@@ -241,7 +250,7 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
 
     # Store max obscuration in new dataframe.
     max_obsc = df.loc[:,~tf].copy()
-    max_obsc['max_obsc'] = obsc_df.max(1)
+    max_obsc['obsc'] = obsc_df.max(1)
 
     sDate = min(dates)
     eDate = max(dates)
@@ -259,7 +268,7 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
 if __name__ == '__main__':
     timer = ScriptTimer()
 
-    multiproc   = True
+    multiproc   = False
     ncpus       = multiprocessing.cpu_count()
 
 ##    # 21 August 2017 Total Solar Eclipse
@@ -316,8 +325,12 @@ if __name__ == '__main__':
         for run_dict in run_list:
             fpath = calc_and_plot_eclipse(run_dict)
 
+    ## Calculate maximum obscuration in each lat-lon cell.
     max_obsc_bname  = os.path.join(output_dir,event_name+'_MAX_OBSCURATION')
     out_csv_fname   = max_obsc_bname+'.csv.bz2'
     max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
+
+    out_png_fname   = max_obsc_bname+'.png'
+    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname)
 
     timer.stop()
