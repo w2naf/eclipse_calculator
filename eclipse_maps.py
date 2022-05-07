@@ -58,8 +58,31 @@ def location_dict(dlat,dlon,height,lat_0=-90.,lat_1=90,lon_0=-180.,lon_1=180):
     dd['height']    = np.ones(dd['lat'].shape)*height
     return dd
 
-def plot_eclipse_dict(run_dict):
-    return plot_eclipse(**run_dict)
+def calc_and_plot_eclipse(run_dict):
+    """
+    Top-level function to call both calc_obscuration_df() and plot_eclipse().
+
+    This function takes in a single diction to allow it to work easily with
+    multiprocessing.pool().
+    """
+    date        = run_dict['date']
+    loc_dict    = run_dict['loc_dict']
+    output_dir  = run_dict['output_dir']
+    height      = loc_dict['height'][0]
+
+    # Define output paths.
+    date_str    = date.strftime('%Y%m%d.%H%M')
+    fname       = '{!s}_{!s}km_eclipseObscuration'.format(date_str,height/1000.)
+    fpath       = os.path.join(output_dir,fname)
+    print('Processing {!s}...'.format(fpath))
+
+    csv_path    = fpath+'.csv.bz2'
+    df          = calc_obscuration_df(date,csv_path=csv_path,**loc_dict)
+
+    fig_path    = fpath+'.png'
+    png_path    = plot_eclipse(df,date,fig_path=fig_path)
+
+    return png_path
 
 def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
     # Set up data dictionary.
@@ -85,20 +108,18 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
 
     return df
 
-
-def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='output'):
+def plot_eclipse(df,date,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
+        nightshade=True,gridsquares=True):
     """
+    df: Pandas DataFrame with Obscuration Data
     region: 'us' or 'world"
     height: [km]
     """
-    # Define output paths.
-    date_str    = date.strftime('%Y%m%d.%H%M')
-    fname       = '{!s}_{!s}km_eclipseObscuration'.format(date_str,height/1000.)
-    fpath       = os.path.join(output_dir,fname)
-    print('Processing {!s}...'.format(fpath))
 
-    csv_path    = fpath+'.csv.bz2'
-    df = calc_obscuration_df(date,csv_path=csv_path,**loc_dict)
+    height = df['height'].unique()
+    n_heights = len(height)
+    assert n_heights  == 1, f'One height expected, got: {n_heights}'
+    height = height[0]
 
     # Calculate vectors of center lats and lons.
     center_lats = np.sort(df['lat'].unique())
@@ -140,8 +161,12 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     crs         = ccrs.PlateCarree()
     ax          = fig.add_subplot(111,projection=ccrs.PlateCarree())
     hmap        = eclipse_calc.maps.HamMap(date,date,ax,show_title=False,**map_prm)
-    hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','linestyle':'--'})
-    hmap.plot_nightshade()
+
+    if gridsquares:
+        hmap.overlay_gridsquares(label_precision=0,major_style={'color':'0.8','linestyle':'--'})
+
+    if nightshade:
+        hmap.plot_nightshade(zorder=500)
 
     cshape      = (len(center_lats),len(center_lons))
     obsc_arr    = df['obsc'].to_numpy().reshape(cshape)
@@ -157,15 +182,15 @@ def plot_eclipse(date,loc_dict,region='world',cmap=mpl.cm.gray_r,output_dir='out
     fontdict    = {'size':'x-large','weight':'bold'}
     hmap.ax.text(0.5,1.075,title,fontdict=fontdict,transform=ax.transAxes,ha='center')
     fig.tight_layout()
-    fig.savefig(fpath+'.png',bbox_inches='tight')
+    fig.savefig(fig_path,bbox_inches='tight')
 
     plt.close(fig)
-    return fpath
+    return fig_path
 
 if __name__ == '__main__':
     timer = ScriptTimer()
 
-    multiproc   = False
+    multiproc   = True
     ncpus       = multiprocessing.cpu_count()
 
     output_dir  = 'output'
@@ -211,14 +236,10 @@ if __name__ == '__main__':
     ## Calculate Eclipse Data and Plot
     if multiproc:
         with multiprocessing.Pool(ncpus) as pool:
-            pool.map(plot_eclipse_dict,run_list)
+            pool.map(calc_and_plot_eclipse,run_list)
     else:
         # Single Processor
         for run_dict in run_list:
-            fpath = plot_eclipse_dict(run_dict)
-
+            fpath = calc_and_plot_eclipse(run_dict)
 
     timer.stop()
-    import ipdb; ipdb.set_trace()
-
-
