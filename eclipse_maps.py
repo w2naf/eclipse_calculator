@@ -274,7 +274,7 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     plt.close(fig)
     return fig_path
 
-def find_eclipse_center(df,min_solar_elev_deg=0):
+def find_eclipse_center(df,min_solar_elev_deg=1):
     """
     Find the the row in an eclipse dataframe that has the minimum moon-sun separation.
     
@@ -288,14 +288,18 @@ def find_eclipse_center(df,min_solar_elev_deg=0):
     #   In that case, their centers are at most (32.7 + 34.1) / 2 = 33.4 arcminutes apart.
     # Also, it is important to choose only cells that meet the eclipse separation AND are on the
     # dayside of the Earth. Therefore, we only look at rows with a minimum solar_elev_deg.
-    # Setting min_solar_elev_deg = 0 seems to work well.
+    # Setting min_solar_elev_deg = 1 seems to work well.
     """
 
-    tf  = np.logical_and(df['solar_elev_deg'] >= min_solar_elev_deg ,df['sun_moon_sep_deg'] < (33.4/60.))
+    tf  = np.logical_and(df['solar_elev_deg'] >= (min_solar_elev_deg-1) ,df['sun_moon_sep_deg'] < (33.4/60.))
     if np.count_nonzero(tf) > 0:
         dft = df[tf]
         argmin = dft['sun_moon_sep_deg'].argmin()
         row = dft.iloc[argmin].to_dict()
+
+        # Discard the edge cases
+        if row['solar_elev_deg'] < min_solar_elev_deg:
+            row = None
     else:
         row = None
 
@@ -314,7 +318,7 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     df    = None
     dates = []
     files = []
-    for fpath in fpaths:
+    for fpath in tqdm.tqdm(fpaths,dynamic_ncols=True,desc='Computing Maximum Obscuration Map'):
         bname = os.path.basename(fpath)
         files.append(bname)
 
@@ -363,7 +367,7 @@ def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     dates       = []
     files       = []
     ecl_track   = []
-    for fpath in fpaths:
+    for fpath in tqdm.tqdm(fpaths,dynamic_ncols=True,desc='Computing Eclipse Track'):
         bname = os.path.basename(fpath)
         files.append(bname)
 
@@ -428,16 +432,11 @@ if __name__ == '__main__':
     sDate   = datetime.datetime(2024,4,8,15)
     eDate   = datetime.datetime(2024,4,8,21)
 
-#    sDate   = datetime.datetime(2024,4,8,18)
-#    eDate   = datetime.datetime(2024,4,8,20)
-
     dt      = datetime.timedelta(minutes=5)
 
-    dlat        = 0.5
-    dlon        = 0.5
-
-#    dlat        = 0.5
-#    dlon        = 0.5
+    # Latitude / Longitude Resolution
+    dlat        = 1.0
+    dlon        = 1.0
 
     height      = 300e3
 
@@ -500,6 +499,5 @@ if __name__ == '__main__':
     out_png_fname   = ecl_track_bname+'_{!s}minObsc.png'.format(min_obsc)
     png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
                             min_obsc=min_obsc,ecl_track_df=ecl_track_df)
-
 
     timer.stop()
