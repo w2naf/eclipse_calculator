@@ -80,12 +80,13 @@ def area_intersect(r_sun,r_moon,d):
 def apparent_size(R, distance):
         return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
-def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
+def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_dict=False):
     """
-    date_time:  datetime.datetime object
-    lat:        degrees +N / -S
-    lon:        degrees +E / -W
-    height:     meters
+    date_time:   datetime.datetime object
+    lat:         degrees +N / -S
+    lon:         degrees +E / -W
+    height:      meters
+    return_dict: If True, return a dictionary with more data than just obscuration values.
 
     returns:    Eclipse obscuration (solar disk area obscured / solar disk area).
                 Obscuration will be 0 if astronomical night.
@@ -123,7 +124,7 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
     A   = area_intersect(r_sun_deg,r_moon_deg,sep_deg)
     obs = A/(np.pi*r_sun_deg**2)
 
-    tf      = sun_aa.alt.value < 18
+    tf      = sun_aa.alt.value < -18
     obs[tf] = 0
 
 #    # Code to plot the obscuration.
@@ -147,7 +148,11 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None):
 
     if len(obs) == 1:
         obs = float(obs)
-    return obs
+
+    if return_dict:
+        return {'obsc':obs,'sun_moon_sep_deg':sep_deg,'sza':sun_aa.alt.value}
+    else:
+        return obs
 
 if __name__ == '__main__':
     # UACNJ Jenny Jump - Hope, NJ
