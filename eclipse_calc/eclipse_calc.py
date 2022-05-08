@@ -150,7 +150,7 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_
         obs = float(obs)
 
     if return_dict:
-        return {'obsc':obs,'sun_moon_sep_deg':sep_deg,'sza':sun_aa.alt.value}
+        return {'obsc':obs,'sun_moon_sep_deg':sep_deg,'solar_elev_deg':sun_aa.alt.value}
     else:
         return obs
 
