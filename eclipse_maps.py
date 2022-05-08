@@ -100,7 +100,7 @@ def calc_and_plot_eclipse(run_dict):
     df          = calc_obscuration_df(date,csv_path=csv_path,**loc_dict)
 
     fig_path    = fpath+'.png'
-    png_path    = plot_eclipse(df,date,fig_path=fig_path)
+    png_path    = plot_eclipse(df,date,fig_path=fig_path,plot_min_sun_moon_sep=True)
 
     return png_path
 
@@ -113,7 +113,11 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
 
     # Eclipse Magnitude
     dates       = np.array(len(dd['lat'])*[date])
-    dd['obsc']  = eclipse_calc.calculate_obscuration(dates,dd['lat'],dd['lon'],height=dd['height'])
+    result      =  eclipse_calc.calculate_obscuration(dates,dd['lat'],dd['lon'],height=dd['height'],return_dict=True)
+
+    dd['obsc']              = result['obsc']
+    dd['sun_moon_sep_deg']  = result['sun_moon_sep_deg']
+    dd['solar_elev_deg']               = result['solar_elev_deg']
 
     # Store into dataframe.
     df          = pd.DataFrame(dd)
@@ -129,7 +133,7 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
     return df
 
 def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
-        min_obsc=0,max_obsc=1,nightshade=True,gridsquares=True):
+        min_obsc=0,max_obsc=1,nightshade=True,gridsquares=True,plot_min_sun_moon_sep=False):
     """
     df: Pandas DataFrame with Obscuration Data
     region: 'us' or 'world"
@@ -209,6 +213,11 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     if cbar_ticks is not None:
         cbar.set_ticks(cbar_ticks)
 
+    if plot_min_sun_moon_sep:
+        ecl_ctr = find_eclipse_center(df)
+        if ecl_ctr:
+            ax.scatter(ecl_ctr['lon'],ecl_ctr['lat'],marker='o',s=50,color='gray',zorder=1000,ec='k')
+
     if sDate == eDate:
         date_str    = sDate.strftime('%d %b %Y %H%M UT')
         title       = '{!s} Height: {!s} km'.format(date_str,height/1000.)
@@ -226,6 +235,33 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
 
     plt.close(fig)
     return fig_path
+
+def find_eclipse_center(df):
+    """
+    Find the the row in an eclipse dataframe that has the minimum moon-sun separation.
+    """
+    
+    # Set some critera to only look at cells that are eclipsed. It is not enough to only
+    # look at minimum sun-moon separation distance, because every df will have a 
+    # min(sep_moon_sep_deg), even if there is no eclipse happening. Solar eclipses will
+    # have a maximum sun-moon separation of 33.4 arcminutes.
+    # From https://astronomy.stackexchange.com/questions/28825/what-is-the-maximum-possible-separation-between-sun-and-moon-in-the-earth-sky-fo
+    #   It can only be a solar eclipse if the Moon is touching the Sun.
+    #
+    #   In that case, their centers are at most (32.7 + 34.1) / 2 = 33.4 arcminutes apart.
+    # Also, it is important to choose only cells that meet the eclipse separation AND are on the
+    # dayside of the Earth. Therefore, we only look at rows with solar_elev_deg > -18 (astronical day).
+
+    tf  = np.logical_and(df['solar_elev_deg'] > -18.,df['sun_moon_sep_deg'] < (33.4/60.))
+    if np.count_nonzero(tf) > 0:
+        dft = df[tf]
+        argmin = dft['sun_moon_sep_deg'].argmin()
+        row = dft.iloc[argmin].to_dict()
+    else:
+        row = None
+
+    return row
+
 
 def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     """
@@ -285,19 +321,22 @@ if __name__ == '__main__':
 ##    # 21 August 2017 Total Solar Eclipse
 ##    sDate   = datetime.datetime(2017,8,21,14)
 ##    eDate   = datetime.datetime(2017,8,21,22)
-#
-##    # 14 October 2023 Total Solar Eclipse
-##    sDate   = datetime.datetime(2023,10,14,14)
-##    eDate   = datetime.datetime(2023,10,14,21)
 
-    # 8 April 2024 Total Solar Eclipse
-    sDate   = datetime.datetime(2024,4,8,15)
-    eDate   = datetime.datetime(2024,4,8,21)
+    # 14 October 2023 Annular Solar Eclipse
+    sDate   = datetime.datetime(2023,10,14,14)
+    eDate   = datetime.datetime(2023,10,14,21)
+
+#    # 8 April 2024 Total Solar Eclipse
+#    sDate   = datetime.datetime(2024,4,8,15)
+#    eDate   = datetime.datetime(2024,4,8,21)
+
+#    sDate   = datetime.datetime(2024,4,8,18)
+#    eDate   = datetime.datetime(2024,4,8,19)
 
     dt      = datetime.timedelta(minutes=5)
 
-    dlat        = 5.
-    dlon        = 5.
+    dlat        = 1.
+    dlon        = 1.
 
 #    dlat        = 0.5
 #    dlon        = 0.5
