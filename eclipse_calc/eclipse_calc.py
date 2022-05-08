@@ -80,7 +80,8 @@ def area_intersect(r_sun,r_moon,d):
 def apparent_size(R, distance):
         return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
-def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_dict=False):
+def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_dict=False,
+        min_solar_elev_deg=0):
     """
     date_time:   datetime.datetime object
     lat:         degrees +N / -S
@@ -89,8 +90,7 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_
     return_dict: If True, return a dictionary with more data than just obscuration values.
 
     returns:    Eclipse obscuration (solar disk area obscured / solar disk area).
-                Obscuration will be 0 if astronomical night.
-                (Sun is > 18 deg below horizon.)
+                Obscuration will be 0 if below the horizon.
     """
     date_time   = array(date_time)
     lat         = array(lat)
@@ -124,7 +124,7 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_
     A   = area_intersect(r_sun_deg,r_moon_deg,sep_deg)
     obs = A/(np.pi*r_sun_deg**2)
 
-    tf      = sun_aa.alt.value < -18
+    tf      = sun_aa.alt.value < min_solar_elev_deg
     obs[tf] = 0
 
 #    # Code to plot the obscuration.

@@ -133,12 +133,17 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
     return df
 
 def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path='output.png',
-        min_obsc=0,max_obsc=1,nightshade=True,gridsquares=True,plot_min_sun_moon_sep=False):
+        min_obsc=0,max_obsc=1,nightshade=True,gridsquares=True,plot_min_sun_moon_sep=False,
+        ecl_track_df=None):
     """
     df: Pandas DataFrame with Obscuration Data
     region: 'us' or 'world"
     height: [km]
+
+    ecl_track_df: Pass a dataframe containing the track information to plot the eclipse track.
     """
+
+    df = df.copy()
 
     if min_obsc > 0:
         tf = df['obsc'] < min_obsc
@@ -192,7 +197,8 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     vmax        = 1.
     cbar_ticks  = np.arange(0,1.1,0.1)
 
-    fig         = plt.figure(figsize=(12,10))
+#    fig         = plt.figure(figsize=(12,10))
+    fig         = plt.figure(figsize=(16,14))
     crs         = ccrs.PlateCarree()
     ax          = fig.add_subplot(111,projection=ccrs.PlateCarree())
     hmap        = eclipse_calc.maps.HamMap(sDate,eDate,ax,show_title=False,**map_prm)
@@ -218,6 +224,38 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
         if ecl_ctr:
             ax.scatter(ecl_ctr['lon'],ecl_ctr['lat'],marker='o',s=50,color='gray',zorder=1000,ec='k')
 
+    if ecl_track_df is not None:
+        for inx,(rinx,row_0) in enumerate(ecl_track_df.iterrows()):
+            lat_0 = row_0['lat']
+            lon_0 = row_0['lon']
+
+            tp = {}
+            tp['bbox']          = dict(boxstyle='round', facecolor='white', alpha=0.75)
+            tp['fontweight']    = 'bold'
+            tp['fontsize']      = 8
+            tp['zorder']        = 975
+            tp['va']            = 'top'
+
+            if inx == 0:
+                ax.text(lon_0,lat_0,'{!s}'.format(rinx.strftime('%H%M UT')),**tp)
+            if inx == len(ecl_track_df)-1:
+                ax.text(lon_0,lat_0,'{!s}'.format(rinx.strftime('%H%M UT')),**tp)
+                continue
+
+            row_1 = ecl_track_df.iloc[inx+1]
+            lat_1 = row_1['lat']
+            lon_1 = row_1['lon']
+
+            ax.annotate('', xy=(lon_1,lat_1), xytext=(lon_0,lat_0),zorder=950,
+                    xycoords='data', size=10,
+                    arrowprops=dict(facecolor='red', ec = 'none', arrowstyle="simple",
+                connectionstyle="arc3,rad=-0.1"))
+
+#            ax.annotate('', xy=(lon_1,lat_1), xytext=(lon_0,lat_0),zorder=950,
+#                    xycoords='data', size=20,
+#                    arrowprops=dict(facecolor='red', ec = 'none', arrowstyle="fancy",
+#                connectionstyle="arc3,rad=-0.3"))
+
     if sDate == eDate:
         date_str    = sDate.strftime('%d %b %Y %H%M UT')
         title       = '{!s} Height: {!s} km'.format(date_str,height/1000.)
@@ -236,10 +274,9 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     plt.close(fig)
     return fig_path
 
-def find_eclipse_center(df):
+def find_eclipse_center(df,min_solar_elev_deg=0):
     """
     Find the the row in an eclipse dataframe that has the minimum moon-sun separation.
-    """
     
     # Set some critera to only look at cells that are eclipsed. It is not enough to only
     # look at minimum sun-moon separation distance, because every df will have a 
@@ -250,9 +287,11 @@ def find_eclipse_center(df):
     #
     #   In that case, their centers are at most (32.7 + 34.1) / 2 = 33.4 arcminutes apart.
     # Also, it is important to choose only cells that meet the eclipse separation AND are on the
-    # dayside of the Earth. Therefore, we only look at rows with solar_elev_deg > -18 (astronical day).
+    # dayside of the Earth. Therefore, we only look at rows with a minimum solar_elev_deg.
+    # Setting min_solar_elev_deg = 0 seems to work well.
+    """
 
-    tf  = np.logical_and(df['solar_elev_deg'] > -18.,df['sun_moon_sep_deg'] < (33.4/60.))
+    tf  = np.logical_and(df['solar_elev_deg'] >= min_solar_elev_deg ,df['sun_moon_sep_deg'] < (33.4/60.))
     if np.count_nonzero(tf) > 0:
         dft = df[tf]
         argmin = dft['sun_moon_sep_deg'].argmin()
@@ -311,6 +350,65 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
         max_obsc.to_csv(out_csv_fname,index=False,header=hdr)
 
     return max_obsc
+
+def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
+    """
+    Read in a set of obscuration dataframe csv.bz2 files and create one file and
+    dataframe that reports the center of the eclipse track for each time.
+    """
+    fpaths = glob.glob(os.path.join(in_csv_path,pattern))
+    fpaths.sort()
+
+    # Load Eclipses
+    dates       = []
+    files       = []
+    ecl_track   = []
+    for fpath in fpaths:
+        bname = os.path.basename(fpath)
+        files.append(bname)
+
+        date  = datetime.datetime.strptime(bname[:13],'%Y%m%d.%H%M')
+        alt   = str(bname[14:17])
+
+        df          = pd.read_csv(fpath,comment='#')
+        ecl_center  = find_eclipse_center(df)
+        if ecl_center:
+            dates.append(date)
+            ecl_track.append(ecl_center)
+
+    ecl_track = pd.DataFrame(ecl_track,index=dates)
+
+    # Compute the azimuth that the eclipse track is heading.
+    azms = []
+    for inx,(rinx,row_0) in enumerate(ecl_track.iterrows()):
+        if inx == len(ecl_track)-1:
+            azms.append(np.nan)
+            continue
+
+        row_1 = ecl_track.iloc[inx+1]
+        
+        lat_0 = row_0['lat']
+        lon_0 = row_0['lon']
+        lat_1 = row_1['lat']
+        lon_1 = row_1['lon']
+
+        azm   = eclipse_calc.geopack.greatCircleAzm(lat_0,lon_0,lat_1,lon_1)
+        azms.append(azm)
+
+    ecl_track['track_azm_deg'] = azms
+
+    sDate = min(dates)
+    eDate = max(dates)
+
+    # Save CSV Datafile.
+    if out_csv_fname:
+        hdr = []
+        hdr.append('# Solar Eclipse center track for {!s} - {!s}\n'.format(sDate,eDate))
+        hdr.append(','.join(df.columns))
+        hdr = '\n'.join(['date_ut']+hdr)
+        ecl_track.to_csv(out_csv_fname,index=False,header=hdr)
+
+    return ecl_track 
     
 if __name__ == '__main__':
     timer = ScriptTimer()
@@ -322,21 +420,21 @@ if __name__ == '__main__':
 ##    sDate   = datetime.datetime(2017,8,21,14)
 ##    eDate   = datetime.datetime(2017,8,21,22)
 
-    # 14 October 2023 Annular Solar Eclipse
-    sDate   = datetime.datetime(2023,10,14,14)
-    eDate   = datetime.datetime(2023,10,14,21)
+#    # 14 October 2023 Annular Solar Eclipse
+#    sDate   = datetime.datetime(2023,10,14,14)
+#    eDate   = datetime.datetime(2023,10,14,21)
 
-#    # 8 April 2024 Total Solar Eclipse
-#    sDate   = datetime.datetime(2024,4,8,15)
-#    eDate   = datetime.datetime(2024,4,8,21)
+    # 8 April 2024 Total Solar Eclipse
+    sDate   = datetime.datetime(2024,4,8,15)
+    eDate   = datetime.datetime(2024,4,8,21)
 
 #    sDate   = datetime.datetime(2024,4,8,18)
-#    eDate   = datetime.datetime(2024,4,8,19)
+#    eDate   = datetime.datetime(2024,4,8,20)
 
     dt      = datetime.timedelta(minutes=5)
 
-    dlat        = 1.
-    dlon        = 1.
+    dlat        = 0.5
+    dlon        = 0.5
 
 #    dlat        = 0.5
 #    dlon        = 0.5
@@ -377,6 +475,11 @@ if __name__ == '__main__':
     out_csv_fname   = max_obsc_bname+'.csv.bz2'
     max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
 
+    ## Calculate eclipse track for event.
+    ecl_track_bname = os.path.join(output_dir,event_name+'_ECLIPSE_TRACK')
+    out_csv_fname   = ecl_track_bname+'.csv.bz2'
+    ecl_track_df    = compute_eclipse_track(frames_dir,out_csv_fname=out_csv_fname)
+
     ## Plot full maximum obscuration map.
     out_png_fname   = max_obsc_bname+'.png'
     png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname)
@@ -386,5 +489,17 @@ if __name__ == '__main__':
     out_png_fname   = max_obsc_bname+'_{!s}minObsc.png'.format(min_obsc)
     png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
                             min_obsc=min_obsc)
+
+    ## Plot full maximum obscuration map with track.
+    out_png_fname   = ecl_track_bname+'.png'
+    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                            ecl_track_df=ecl_track_df)
+
+    ## Plot max obscurations greater than 90% with eclipse_track.
+    min_obsc        = 0.9
+    out_png_fname   = ecl_track_bname+'_{!s}minObsc.png'.format(min_obsc)
+    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                            min_obsc=min_obsc,ecl_track_df=ecl_track_df)
+
 
     timer.stop()
