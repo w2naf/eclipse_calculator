@@ -425,7 +425,7 @@ def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     if out_csv_fname:
         hdr = []
         hdr.append('# Solar Eclipse center track for {!s} - {!s}'.format(sDate,eDate))
-        hdr.append(','.join(['date_ut']+df.columns.to_list()))
+        hdr.append(','.join(['date_ut']+ecl_track.columns.to_list()))
         hdr = '\n'.join(hdr)
         hdr += '\n'
 
@@ -450,11 +450,11 @@ if __name__ == '__main__':
 #    dd['eDate'] = datetime.datetime(2017,8,21,22)
 #    seDates.append(dd)
 
-#    # 14 October 2023 Annular Solar Eclipse
-#    dd = {}
-#    dd['sDate'] = datetime.datetime(2023,10,14,14)
-#    dd['eDate'] = datetime.datetime(2023,10,14,21)
-#    seDates.append(dd)
+    # 14 October 2023 Annular Solar Eclipse
+    dd = {}
+    dd['sDate'] = datetime.datetime(2023,10,14,14)
+    dd['eDate'] = datetime.datetime(2023,10,14,21)
+    seDates.append(dd)
 
 #    # 8 April 2024 Total Solar Eclipse
 #    dd = {}
@@ -462,12 +462,12 @@ if __name__ == '__main__':
 #    dd['eDate'] = datetime.datetime(2024,4,8,21)
 #    seDates.append(dd)
 
-    # SHORT TEST CASES
-    # 8 April 2024 Total Solar Eclipse - SHORT TEST CASE
-    dd = {}
-    dd['sDate'] = datetime.datetime(2024,4,8,18)
-    dd['eDate'] = datetime.datetime(2024,4,8,19)
-    seDates.append(dd)
+#    # SHORT TEST CASES
+#    # 8 April 2024 Total Solar Eclipse - SHORT TEST CASE
+#    dd = {}
+#    dd['sDate'] = datetime.datetime(2024,4,8,18)
+#    dd['eDate'] = datetime.datetime(2024,4,8,19)
+#    seDates.append(dd)
 
 #    # 14 October 2023 Annular Solar Eclipse
 #    dd = {}
@@ -489,8 +489,8 @@ if __name__ == '__main__':
     dt      = datetime.timedelta(minutes=5)
 
     # Latitude / Longitude Resolution
-    dlat        = 10.
-    dlon        = 10.
+    dlat        = 0.2
+    dlon        = 0.2
 
     for rd in run_dicts:
         sDate   = rd['sDate']
