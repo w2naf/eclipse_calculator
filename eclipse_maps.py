@@ -117,7 +117,7 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
 
     dd['obsc']              = result['obsc']
     dd['sun_moon_sep_deg']  = result['sun_moon_sep_deg']
-    dd['solar_elev_deg']               = result['solar_elev_deg']
+    dd['solar_elev_deg']    = result['solar_elev_deg']
 
     # Store into dataframe.
     df          = pd.DataFrame(dd)
@@ -125,10 +125,14 @@ def calc_obscuration_df(date,lat,lon,height,csv_path=None,**kw_args):
     # Save CSV Datafile.
     if csv_path:
         hdr = []
-        hdr.append('# Solar Eclipse Obscuration file for {!s}\n'.format(date))
+        hdr.append('# Solar Eclipse Obscuration file for {!s}'.format(date))
         hdr.append(','.join(df.columns))
         hdr = '\n'.join(hdr)
-        df.to_csv(csv_path,index=False,header=hdr)
+        hdr += '\n'
+
+        with bz2.open(csv_path,'wt') as bzfl:
+            bzfl.write(hdr)
+            df.to_csv(bzfl,index=False,header=False)
 
     return df
 
@@ -177,6 +181,15 @@ def plot_eclipse(df,sDate,eDate=None,region='world',cmap=mpl.cm.gray_r,fig_path=
     lon_0 = center_lons.min() - dlon/2.
     lon_1 = center_lons.max() + dlon/2.
     lons    = np.arange(lon_0,lon_1+dlon,dlon)
+
+    # These if statements are to handle an error that can occur
+    # when dlat or dlon are very small and you get the wrong number
+    # of elements due to a small numerical error.
+    if len(lats) > len(center_lats)+1:
+        lats=lats[:len(center_lats)+1]
+
+    if len(lons) > len(center_lons)+1:
+        lons=lons[:len(center_lons)+1]
 
     # Plot data.
     map_prm = {}
@@ -348,10 +361,14 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     # Save CSV Datafile.
     if out_csv_fname:
         hdr = []
-        hdr.append('# Solar Eclipse Maximum Obscuration file for {!s} - {!s}\n'.format(sDate,eDate))
-        hdr.append(','.join(df.columns))
+        hdr.append('# Solar Eclipse Maximum Obscuration file for {!s} - {!s}'.format(sDate,eDate))
+        hdr.append(','.join(max_obsc.columns))
         hdr = '\n'.join(hdr)
-        max_obsc.to_csv(out_csv_fname,index=False,header=hdr)
+        hdr += '\n'
+
+        with bz2.open(out_csv_fname,'wt') as bzfl:
+            bzfl.write(hdr)
+            max_obsc.to_csv(bzfl,index=False,header=False)
 
     return max_obsc
 
@@ -375,6 +392,7 @@ def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
         alt   = str(bname[14:17])
 
         df          = pd.read_csv(fpath,comment='#')
+
         ecl_center  = find_eclipse_center(df)
         if ecl_center:
             dates.append(date)
@@ -404,100 +422,141 @@ def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
     sDate = min(dates)
     eDate = max(dates)
 
-    # Save CSV Datafile.
     if out_csv_fname:
         hdr = []
-        hdr.append('# Solar Eclipse center track for {!s} - {!s}\n'.format(sDate,eDate))
-        hdr.append(','.join(df.columns))
-        hdr = '\n'.join(['date_ut']+hdr)
-        ecl_track.to_csv(out_csv_fname,index=False,header=hdr)
+        hdr.append('# Solar Eclipse center track for {!s} - {!s}'.format(sDate,eDate))
+        hdr.append(','.join(['date_ut']+df.columns.to_list()))
+        hdr = '\n'.join(hdr)
+        hdr += '\n'
+
+        with bz2.open(out_csv_fname,'wt') as bzfl:
+            bzfl.write(hdr)
+            ecl_track.to_csv(bzfl,header=False)
 
     return ecl_track 
     
 if __name__ == '__main__':
     timer = ScriptTimer()
 
-    multiproc   = True
-    ncpus       = multiprocessing.cpu_count()
+    recalc_eclipse  = True
+    multiproc       = True
+    ncpus           = multiprocessing.cpu_count()
 
-##    # 21 August 2017 Total Solar Eclipse
-##    sDate   = datetime.datetime(2017,8,21,14)
-##    eDate   = datetime.datetime(2017,8,21,22)
+    seDates = []
+
+    # 21 August 2017 Total Solar Eclipse
+#    dd = {}
+#    dd['sDate'] = datetime.datetime(2017,8,21,14)
+#    dd['eDate'] = datetime.datetime(2017,8,21,22)
+#    seDates.append(dd)
 
 #    # 14 October 2023 Annular Solar Eclipse
-#    sDate   = datetime.datetime(2023,10,14,14)
-#    eDate   = datetime.datetime(2023,10,14,21)
+#    dd = {}
+#    dd['sDate'] = datetime.datetime(2023,10,14,14)
+#    dd['eDate'] = datetime.datetime(2023,10,14,21)
+#    seDates.append(dd)
 
-    # 8 April 2024 Total Solar Eclipse
-    sDate   = datetime.datetime(2024,4,8,15)
-    eDate   = datetime.datetime(2024,4,8,21)
+#    # 8 April 2024 Total Solar Eclipse
+#    dd = {}
+#    dd['sDate'] = datetime.datetime(2024,4,8,15)
+#    dd['eDate'] = datetime.datetime(2024,4,8,21)
+#    seDates.append(dd)
+
+    # SHORT TEST CASES
+    # 8 April 2024 Total Solar Eclipse - SHORT TEST CASE
+    dd = {}
+    dd['sDate'] = datetime.datetime(2024,4,8,18)
+    dd['eDate'] = datetime.datetime(2024,4,8,19)
+    seDates.append(dd)
+
+#    # 14 October 2023 Annular Solar Eclipse
+#    dd = {}
+#    dd['sDate'] = datetime.datetime(2023,10,14,18)
+#    dd['eDate'] = datetime.datetime(2023,10,14,19)
+#    seDates.append(dd)
+
+    heights     = [300e3]
+#    heights     = np.arange(0,500,50)*1e3
+
+    # Create Run Dictionaries for all iterations of dates, heights.
+    run_dicts = []
+    for seDate in seDates:
+        for height in heights:
+            rd = seDate.copy()
+            rd['height'] = height
+            run_dicts.append(rd)
 
     dt      = datetime.timedelta(minutes=5)
 
     # Latitude / Longitude Resolution
-    dlat        = 1.0
-    dlon        = 1.0
+    dlat        = 10.
+    dlon        = 10.
 
-    height      = 300e3
+    for rd in run_dicts:
+        sDate   = rd['sDate']
+        eDate   = rd['eDate']
+        height  = rd['height']
 
-    ################################################################################ 
-    event_name  = get_event_name(sDate,eDate,height,dlat,dlon)
-    output_dir  = os.path.join('output',event_name)
-    frames_dir  = os.path.join(output_dir,'frames')
+        ################################################################################ 
+        event_name  = get_event_name(sDate,eDate,height,dlat,dlon)
+        output_dir  = os.path.join('output',event_name)
+        frames_dir  = os.path.join(output_dir,'frames')
 
-    eclipse_calc.gen_lib.clear_dir(output_dir)
-    eclipse_calc.gen_lib.make_dir(frames_dir)
+        if recalc_eclipse:
+            eclipse_calc.gen_lib.clear_dir(output_dir)
+            eclipse_calc.gen_lib.make_dir(frames_dir)
 
-    loc_dict    = location_dict(dlat,dlon,height)
+        loc_dict    = location_dict(dlat,dlon,height)
 
-    run_list    = []
-    cDate       = sDate
-    while cDate < eDate:
-        tmp = {}
-        tmp['date']         = cDate
-        tmp['loc_dict']     = loc_dict
-        tmp['output_dir']   = frames_dir
-        run_list.append(tmp)
-        cDate   += dt
+        run_list    = []
+        cDate       = sDate
+        while cDate < eDate:
+            tmp = {}
+            tmp['date']         = cDate
+            tmp['loc_dict']     = loc_dict
+            tmp['output_dir']   = frames_dir
+            run_list.append(tmp)
+            cDate   += dt
 
-    ## Calculate Eclipse Data and Plot
-    if multiproc:
-        with multiprocessing.Pool(ncpus) as pool:
-            pool.map(calc_and_plot_eclipse,run_list)
-    else:
-        # Single Processor
-        for run_dict in run_list:
-            fpath = calc_and_plot_eclipse(run_dict)
+        if recalc_eclipse:
+            ## Calculate Eclipse Data and Plot
+            if multiproc:
+                with multiprocessing.Pool(ncpus) as pool:
+                    pool.map(calc_and_plot_eclipse,run_list)
+            else:
+                # Single Processor
+                for run_dict in run_list:
+                    fpath = calc_and_plot_eclipse(run_dict)
 
-    ## Calculate maximum obscuration in each lat-lon cell.
-    max_obsc_bname  = os.path.join(output_dir,event_name+'_MAX_OBSCURATION')
-    out_csv_fname   = max_obsc_bname+'.csv.bz2'
-    max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
+        ## Calculate maximum obscuration in each lat-lon cell.
+        max_obsc_bname  = os.path.join(output_dir,event_name+'_MAX_OBSCURATION')
+        out_csv_fname   = max_obsc_bname+'.csv.bz2'
+        max_obsc_df     = calc_max_obsc(frames_dir,out_csv_fname=out_csv_fname)
 
-    ## Calculate eclipse track for event.
-    ecl_track_bname = os.path.join(output_dir,event_name+'_ECLIPSE_TRACK')
-    out_csv_fname   = ecl_track_bname+'.csv.bz2'
-    ecl_track_df    = compute_eclipse_track(frames_dir,out_csv_fname=out_csv_fname)
+        ## Calculate eclipse track for event.
+        ecl_track_bname = os.path.join(output_dir,event_name+'_ECLIPSE_TRACK')
+        out_csv_fname   = ecl_track_bname+'.csv.bz2'
+        ecl_track_df    = compute_eclipse_track(frames_dir,out_csv_fname=out_csv_fname)
 
-    ## Plot full maximum obscuration map.
-    out_png_fname   = max_obsc_bname+'.png'
-    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname)
+        ## Plot full maximum obscuration map.
+        out_png_fname   = max_obsc_bname+'.png'
+        png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname)
 
-    ## Plot max obscurations greater than 90%.
-    min_obsc        = 0.9
-    out_png_fname   = max_obsc_bname+'_{!s}minObsc.png'.format(min_obsc)
-    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
-                            min_obsc=min_obsc)
+        ## Plot max obscurations greater than 90%.
+        min_obsc        = 0.9
+        out_png_fname   = max_obsc_bname+'_{!s}minObsc.png'.format(min_obsc)
+        png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                                min_obsc=min_obsc)
 
-    ## Plot full maximum obscuration map with track.
-    out_png_fname   = ecl_track_bname+'.png'
-    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
-                            ecl_track_df=ecl_track_df)
+        ## Plot full maximum obscuration map with track.
+        out_png_fname   = ecl_track_bname+'.png'
+        png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                                ecl_track_df=ecl_track_df)
 
-    ## Plot max obscurations greater than 90% with eclipse_track.
-    min_obsc        = 0.9
-    out_png_fname   = ecl_track_bname+'_{!s}minObsc.png'.format(min_obsc)
-    png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
-                            min_obsc=min_obsc,ecl_track_df=ecl_track_df)
+        ## Plot max obscurations greater than 90% with eclipse_track.
+        min_obsc        = 0.9
+        out_png_fname   = ecl_track_bname+'_{!s}minObsc.png'.format(min_obsc)
+        png_path        = plot_eclipse(max_obsc_df,sDate,eDate,nightshade=False,fig_path=out_png_fname,
+                                min_obsc=min_obsc,ecl_track_df=ecl_track_df)
 
     timer.stop()
