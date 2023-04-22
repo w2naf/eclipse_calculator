@@ -372,10 +372,14 @@ def calc_max_obsc(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
 
     return max_obsc
 
-def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
+def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None,track_geometry_path=None):
     """
     Read in a set of obscuration dataframe csv.bz2 files and create one file and
     dataframe that reports the center of the eclipse track for each time.
+
+    track_geometry_path:    Path to save plots of Sun-Moon geometry used for making obscuration calculations.
+                            In None, do not output these plots.
+
     """
     fpaths = glob.glob(os.path.join(in_csv_path,pattern))
     fpaths.sort()
@@ -392,8 +396,16 @@ def compute_eclipse_track(in_csv_path,pattern='*.csv.bz2',out_csv_fname=None):
         alt   = str(bname[14:17])
 
         df          = pd.read_csv(fpath,comment='#')
-
         ecl_center  = find_eclipse_center(df)
+
+        if (track_geometry_path is not None) and (ecl_center is not None):
+            if not os.path.exists(track_geometry_path):
+                os.makedirs(track_geometry_path)
+            plot_obscuration_fname = '{!s}_geometry_view.png'.format(date.strftime('%Y%m%d.%H%M'))
+            plot_obscuration_fpath = os.path.join(track_geometry_path,plot_obscuration_fname)
+            result      =  eclipse_calc.calculate_obscuration(date,ecl_center['lat'],ecl_center['lon'],
+                    height=ecl_center['height'],return_dict=True,plot_obscuration=plot_obscuration_fpath)
+
         if ecl_center:
             dates.append(date)
             ecl_track.append(ecl_center)
@@ -456,11 +468,11 @@ if __name__ == '__main__':
     dd['eDate'] = datetime.datetime(2023,10,14,21)
     seDates.append(dd)
 
-#    # 8 April 2024 Total Solar Eclipse
-#    dd = {}
-#    dd['sDate'] = datetime.datetime(2024,4,8,15)
-#    dd['eDate'] = datetime.datetime(2024,4,8,21)
-#    seDates.append(dd)
+    # 8 April 2024 Total Solar Eclipse
+    dd = {}
+    dd['sDate'] = datetime.datetime(2024,4,8,15)
+    dd['eDate'] = datetime.datetime(2024,4,8,21)
+    seDates.append(dd)
 
 #    # SHORT TEST CASES
 #    # 8 April 2024 Total Solar Eclipse - SHORT TEST CASE
@@ -475,8 +487,7 @@ if __name__ == '__main__':
 #    dd['eDate'] = datetime.datetime(2023,10,14,19)
 #    seDates.append(dd)
 
-    heights     = [300e3]
-#    heights     = np.arange(0,500,50)*1e3
+    heights     = np.arange(0,500,50)*1e3
 
     # Create Run Dictionaries for all iterations of dates, heights.
     run_dicts = []
@@ -536,7 +547,9 @@ if __name__ == '__main__':
         ## Calculate eclipse track for event.
         ecl_track_bname = os.path.join(output_dir,event_name+'_ECLIPSE_TRACK')
         out_csv_fname   = ecl_track_bname+'.csv.bz2'
-        ecl_track_df    = compute_eclipse_track(frames_dir,out_csv_fname=out_csv_fname)
+        track_geometry_path = os.path.join(output_dir,'track_geometry')
+        ecl_track_df    = compute_eclipse_track(frames_dir,out_csv_fname=out_csv_fname,
+                track_geometry_path=track_geometry_path)
 
         ## Plot full maximum obscuration map.
         out_png_fname   = max_obsc_bname+'.png'
