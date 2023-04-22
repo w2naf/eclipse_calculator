@@ -2,6 +2,8 @@
 import datetime
 import numpy as np
 
+from matplotlib import pyplot as plt
+
 #import astropy
 from astropy import units as u
 from astropy.time import Time
@@ -63,9 +65,9 @@ def area_intersect(r_sun,r_moon,d):
     tf_none         = np.logical_not(intersect)
     A[tf_none]      = 0.
 
-    # Compute area when the sun is bigger than the moon.
+    # Compute area when the sun is bigger than the moon. (Annular eclipse.)
     tf_annular      = np.logical_and(inset,r_sun > r_moon)
-    A[tf_annular]   = np.pi*r_sun[tf_annular]**2 - np.pi*r_moon[tf_annular]**2
+    A[tf_annular]   = np.pi*r_sun[tf_annular]**2 - (np.pi*r_sun[tf_annular]**2 - np.pi*r_moon[tf_annular]**2)
 
     # Compute area when the moon is bigger than the sun.
     tf_total        = np.logical_and(inset,r_sun <= r_moon)
@@ -81,13 +83,19 @@ def apparent_size(R, distance):
         return (R/distance).to(u.arcmin, u.dimensionless_angles())
 
 def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_dict=False,
-        min_solar_elev_deg=0):
+        min_solar_elev_deg=0,plot_obscuration=None):
     """
     date_time:   datetime.datetime object
     lat:         degrees +N / -S
     lon:         degrees +E / -W
     height:      meters
-    return_dict: If True, return a dictionary with more data than just obscuration values.
+    loc:         AstroPy EarthLocation object. If provided, this is used instead of lon, lat, and height.
+    return_dict:        If True, return a dictionary with more data than just obscuration values.
+    min_solar_elev_deg: Minimum solar elevation in degrees to report an obscuration value greater than 0.
+                        This is used to prevent eclipses from being predicted on the nightside of the Earth.
+    plot_obscuration:   Filename/path to save an image of the plot showing the computed obscuration geometry.
+                        Images will only be produced for single location inputs (not vectors/arrays).
+                        If None, no image is saved.
 
     returns:    Eclipse obscuration (solar disk area obscured / solar disk area).
                 Obscuration will be 0 if below the horizon.
@@ -127,24 +135,33 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_
     tf      = sun_aa.alt.value < min_solar_elev_deg
     obs[tf] = 0
 
-#    # Code to plot the obscuration.
-#    # From https://gist.github.com/eteq/f879c2fe69d75d1c5a9e007b0adce30d
-#    sun_circle  = plt.Circle((sun_aa.az.deg, sun_aa.alt.deg), 
-#			    sunsize.to(u.deg).value,
-#			    fc='yellow')
-#    moon_circle = plt.Circle((moon_aa.az.deg, moon_aa.alt.deg), 
-#			     moonsize.to(u.deg).value,
-#			     fc='black', alpha=.5)
-#
-#    ax = plt.subplot(aspect=1)
-#    ax.add_patch(sun_circle)
-#    ax.add_patch(moon_circle)
-#    biggest = max(sep.deg, sunsize.to(u.deg).value, moonsize.to(u.deg).value)
-#    plt.xlim(sun_aa.az.deg-biggest*1.2, sun_aa.az.deg+biggest*1.2)
-#    plt.ylim(sun_aa.alt.deg-biggest*1.2, sun_aa.alt.deg+biggest*1.2)
-#
-#    plt.xlabel('Azimuth')
-#    plt.ylabel('Altitude');
+    if (plot_obscuration is not None) and (len(lat) == 1):
+        # Code to plot the obscuration.
+        # From https://gist.github.com/eteq/f879c2fe69d75d1c5a9e007b0adce30d
+        sun_circle  = plt.Circle((sun_aa.az.deg, sun_aa.alt.deg), 
+                    sunsize.to(u.deg).value,
+                    fc='yellow')
+        moon_circle = plt.Circle((moon_aa.az.deg, moon_aa.alt.deg), 
+                     moonsize.to(u.deg).value,
+                     fc='black', alpha=.5)
+
+        ax = plt.subplot(aspect=1)
+        ax.add_patch(sun_circle)
+        ax.add_patch(moon_circle)
+        biggest = max(sep.deg, sunsize.to(u.deg).value, moonsize.to(u.deg).value)
+        plt.xlim(sun_aa.az.deg-biggest*1.2, sun_aa.az.deg+biggest*1.2)
+        plt.ylim(sun_aa.alt.deg-biggest*1.2, sun_aa.alt.deg+biggest*1.2)
+
+        plt.xlabel('Azimuth')
+        plt.ylabel('Altitude');
+
+        title = []
+        txt = 'Lat: {:0.2f}\N{DEGREE SIGN} Lon: {:0.2f}\N{DEGREE SIGN} Height: {!s} km'.format(lat[0],lon[0],height[0]/1000.)
+        title.append(txt)
+        txt = 'Obsc: {:0.3f} Sun-Moon Sep: {:0.4f}\N{DEGREE SIGN} Solar Elevation: {:0.1f}\N{DEGREE SIGN}'.format(float(obs),float(sep_deg),float(sun_aa.alt.value))
+        title.append(txt)
+        plt.title('\n'.join(title))
+        plt.savefig(plot_obscuration,bbox_inches='tight')
 
     if len(obs) == 1:
         obs = float(obs)
