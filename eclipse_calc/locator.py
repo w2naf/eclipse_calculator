@@ -188,13 +188,13 @@ def gridsquare2latlon(gridsquare,position='center'):
         alpha = not bool(pos/2 % 2)
         
         if alpha:
-            lon_inx = np.array(alpha_pd.loc[lon_code].tolist(),dtype=np.float)
+            lon_inx = np.array(alpha_pd.loc[lon_code].tolist(),dtype=float)
 
-            lat_inx = np.array(alpha_pd.loc[lat_code].tolist(),dtype=np.float)
+            lat_inx = np.array(alpha_pd.loc[lat_code].tolist(),dtype=float)
             if pos != 0: base = 24.
         else:
-            lon_inx = np.array(lon_code,dtype=np.float)
-            lat_inx = np.array(lat_code,dtype=np.float)
+            lon_inx = np.array(lon_code,dtype=float)
+            lat_inx = np.array(lat_code,dtype=float)
 
             base = 10.
 
@@ -233,8 +233,8 @@ def gridsquare2latlon(gridsquare,position='center'):
         lon += container_size_lon
     
     # Convert things back to include NaNs.
-    ret_lat     = np.ndarray([gs_1.size],dtype=np.float)
-    ret_lon     = np.ndarray([gs_1.size],dtype=np.float)
+    ret_lat     = np.ndarray([gs_1.size],dtype=float)
+    ret_lon     = np.ndarray([gs_1.size],dtype=float)
 
     ret_lat[:]  = np.nan
     ret_lon[:]  = np.nan
