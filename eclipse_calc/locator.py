@@ -91,8 +91,8 @@ def latlon2gridsquare(lat,lon,precision=6):
     zLats_rem        = zLats % container_size_lat
     zLons_rem        = zLons % container_size_lon
 
-    lat_code_inx     = np.array(np.floor(zLats_rem / subdivide_size_lat),dtype=np.int)
-    lon_code_inx     = np.array(np.floor(zLons_rem / subdivide_size_lon),dtype=np.int)
+    lat_code_inx     = np.array(np.floor(zLats_rem / subdivide_size_lat),dtype=int)
+    lon_code_inx     = np.array(np.floor(zLons_rem / subdivide_size_lon),dtype=int)
 
     lon_code  = alpha_upper[lon_code_inx]
     lat_code  = alpha_upper[lat_code_inx]
@@ -121,8 +121,8 @@ def latlon2gridsquare(lat,lon,precision=6):
         zLats_rem        = zLats_rem % container_size_lat
         zLons_rem        = zLons_rem % container_size_lon
 
-        lat_code_inx     = np.array(np.floor(zLats_rem / subdivide_size_lat),dtype=np.int)
-        lon_code_inx     = np.array(np.floor(zLons_rem / subdivide_size_lon),dtype=np.int)
+        lat_code_inx     = np.array(np.floor(zLats_rem / subdivide_size_lat),dtype=int)
+        lon_code_inx     = np.array(np.floor(zLons_rem / subdivide_size_lon),dtype=int)
 
         lon_code    = str_code[lon_code_inx]
         lat_code    = str_code[lat_code_inx]
