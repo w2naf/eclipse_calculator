@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 #import astropy
 from astropy import units as u
 from astropy.time import Time
-from astropy.coordinates import EarthLocation, AltAz, get_sun, get_moon
+from astropy.coordinates import EarthLocation, AltAz, get_body
 from astropy import constants
 
 def array(val):
@@ -118,8 +118,8 @@ def calculate_obscuration(date_time,lat=None,lon=None,height=0.,loc=None,return_
     time_aa     = Time(date_time)
     aaframe     = AltAz(obstime=time_aa, location=loc)
 
-    sun_aa      = get_sun(time_aa).transform_to(aaframe)
-    moon_aa     = get_moon(time_aa).transform_to(aaframe)
+    sun_aa      = get_body('sun',time_aa).transform_to(aaframe)
+    moon_aa     = get_body('moon',time_aa).transform_to(aaframe)
     sep         = sun_aa.separation(moon_aa)
 
     sunsize     = apparent_size(R_sun, sun_aa.distance)
